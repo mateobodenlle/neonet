@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 36 18% 98%;
+    --foreground: 30 5% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 30 5% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 30 5% 15%;
+    --primary: 220 18% 20%;
+    --primary-foreground: 36 18% 98%;
+    --secondary: 30 8% 95%;
+    --secondary-foreground: 30 5% 15%;
+    --muted: 30 8% 96%;
+    --muted-foreground: 30 4% 42%;
+    --accent: 220 55% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 8% 90%;
+    --input: 30 8% 88%;
+    --ring: 220 55% 48%;
+    --radius: 0.5rem;
+
+    --success: 145 50% 38%;
+
+    --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: var(--font-geist-mono), ui-monospace, Menlo, monospace;
+  }
+
+  .dark {
+    --background: 240 6% 9%;
+    --foreground: 30 10% 90%;
+    --card: 240 5% 11%;
+    --card-foreground: 30 10% 90%;
+    --popover: 240 5% 11%;
+    --popover-foreground: 30 10% 90%;
+    --primary: 30 10% 90%;
+    --primary-foreground: 240 6% 9%;
+    --secondary: 240 4% 15%;
+    --secondary-foreground: 30 10% 90%;
+    --muted: 240 4% 15%;
+    --muted-foreground: 30 6% 60%;
+    --accent: 220 60% 62%;
+    --accent-foreground: 240 6% 9%;
+    --destructive: 0 65% 58%;
+    --destructive-foreground: 240 6% 9%;
+    --border: 240 4% 18%;
+    --input: 240 4% 18%;
+    --ring: 220 60% 62%;
+
+    --success: 145 45% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01", "calt";
+  }
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer utilities {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}
