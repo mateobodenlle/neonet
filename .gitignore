@@ -1,0 +1,31 @@
+# dependencies
+node_modules
+package-lock.json.bak
+
+# build output
+.next
+out
+dist
+tsconfig.tsbuildinfo
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# system
+.DS_Store
+Thumbs.db
+
+# editor / tooling local
+.vscode
+.idea
+*.swp
+.claude
+
+# next
+next-env.d.ts
+
+# logs
+*.log
+npm-debug.log*
