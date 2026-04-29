@@ -11,6 +11,7 @@ import { TemperatureBadge } from "@/components/temperature-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { daysBetween, formatDate, relativeDate } from "@/lib/utils";
 import { CalendarDays, Plus, Sun } from "lucide-react";
+import { NLInputCard } from "@/components/nl-input-card";
 
 type Filter = "all" | "today" | "week" | "overdue";
 
@@ -77,6 +78,8 @@ export function ClassicHome() {
           <Link href="/contacts"><Plus className="h-3.5 w-3.5" /> Nuevo contacto</Link>
         </Button>
       </header>
+
+      <NLInputCard />
 
       {hasToday && (
         <Card>
