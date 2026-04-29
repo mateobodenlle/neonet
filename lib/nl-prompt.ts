@@ -90,7 +90,7 @@ export const EXTRACTION_SCHEMA = {
             person_text: { type: "string" },
             field: {
               type: "string",
-              enum: ["company", "role", "location", "next_step", "interests", "tags", "category", "temperature"],
+              enum: ["company", "role", "location", "next_step", "interests", "tags", "category", "temperature", "closeness"],
             },
             new_value: { type: "string" },
           },

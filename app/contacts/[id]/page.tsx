@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { PersonAvatar } from "@/components/person-avatar";
 import { TemperaturePicker } from "@/components/temperature-picker";
+import { ClosenessPicker } from "@/components/closeness-picker";
 import { CategoryPicker } from "@/components/category-picker";
 import { TagsEditor } from "@/components/tags-editor";
 import { ContactDialog } from "@/components/add-contact-dialog";
@@ -148,6 +149,11 @@ export default function ContactDetailPage() {
             <TemperaturePicker
               value={person.temperature}
               onChange={(t: Temperature) => updatePerson(person.id, { temperature: t })}
+            />
+            <span className="text-muted-foreground">·</span>
+            <ClosenessPicker
+              value={person.closeness}
+              onChange={(c) => updatePerson(person.id, { closeness: c })}
             />
             <span className="text-muted-foreground">·</span>
             <CategoryPicker
