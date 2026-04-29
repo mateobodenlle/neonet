@@ -5,6 +5,7 @@ import "./globals.css";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { CommandPalette } from "@/components/command-palette";
+import { HydrationGate } from "@/components/hydration-gate";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -19,7 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="flex min-h-screen">
           <AppSidebar />
           <main className="flex-1 min-w-0">
-            <div className="mx-auto max-w-[1240px] px-10 py-10">{children}</div>
+            <div className="mx-auto max-w-[1240px] px-10 py-10">
+              <HydrationGate>{children}</HydrationGate>
+            </div>
           </main>
         </div>
         <CommandPalette />
