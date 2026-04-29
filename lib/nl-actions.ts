@@ -109,6 +109,9 @@ function applyUpdateField(p: Person, field: ExtractedPersonUpdate["field"], valu
     case "category":
       next.category = value as Person["category"];
       break;
+    case "closeness":
+      next.closeness = value as Person["closeness"];
+      break;
     case "temperature":
       next.temperature = value as Person["temperature"];
       break;

@@ -9,6 +9,27 @@ export type Category =
 
 export type Temperature = "frio" | "tibio" | "caliente";
 
+/**
+ * Atemporal personal closeness — distinct from the commercial Temperature
+ * (which moves with current activity). Ordered from least to most close.
+ */
+export type Closeness =
+  | "desconocido"
+  | "conocido"
+  | "amigable"
+  | "amigo"
+  | "amigo-cercano"
+  | "mejor-amigo";
+
+export const CLOSENESS_LEVELS: Closeness[] = [
+  "desconocido",
+  "conocido",
+  "amigable",
+  "amigo",
+  "amigo-cercano",
+  "mejor-amigo",
+];
+
 export type Sector =
   | "fintech"
   | "saas"
@@ -121,6 +142,7 @@ export interface Person {
   handles?: SocialHandles;
   category: Category;
   temperature: Temperature;
+  closeness?: Closeness;
   tags: string[];
   interests?: string[];
   affinity?: 1 | 2 | 3 | 4 | 5;

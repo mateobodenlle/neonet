@@ -42,7 +42,7 @@ export interface ExtractedPromise {
 
 export interface ExtractedPersonUpdate {
   person_text: string;
-  field: "company" | "role" | "location" | "next_step" | "interests" | "tags" | "category" | "temperature";
+  field: "company" | "role" | "location" | "next_step" | "interests" | "tags" | "category" | "temperature" | "closeness";
   new_value: string;
 }
 

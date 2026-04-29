@@ -57,6 +57,7 @@ export interface PersonRow {
   handles: Record<string, string> | null;
   category: string;
   temperature: string;
+  closeness: string | null;
   tags: string[];
   interests: string[];
   affinity: number | null;
