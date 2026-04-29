@@ -59,3 +59,25 @@ Lo que queda para que sea "mi herramienta" de verdad:
 - App móvil Android con voice-first.
 
 Lo demás es polish.
+
+---
+
+## Setup local
+
+```bash
+npm install --legacy-peer-deps
+cp .env.example .env.local       # rellena con las claves del proyecto Supabase
+npm run db:migrate                # aplica migraciones SQL pendientes
+npm run db:seed                   # carga el dataset mock (idempotente; usa --force para re-sembrar)
+npm run dev
+```
+
+`.env.local` requiere:
+
+- `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` — públicas, las usa el navegador.
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only, bypass de RLS (scripts y server actions).
+- `SUPABASE_DB_URL` — connection string Postgres directa, sólo para `db:migrate`.
+
+## Convenciones
+
+Ver [`CONTRIBUTING.md`](./CONTRIBUTING.md) para estándares de commits, branching, versionado y reglas de autoría.
