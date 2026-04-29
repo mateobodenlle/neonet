@@ -11,6 +11,7 @@
     "db:check": "tsx scripts/check-schema.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:reseed": "tsx scripts/seed.ts -- --force",
+    "db:wipe": "tsx scripts/wipe.ts",
     "import:vcard": "tsx scripts/import-vcard.ts",
     "import:linkedin": "tsx scripts/import-linkedin.ts"
   },
