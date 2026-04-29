@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
-import { Check, Loader2, AlertTriangle, UserPlus, User, MinusCircle, Calendar, Flame, Handshake, Link2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, Loader2, AlertTriangle, UserPlus, User, MinusCircle, Calendar, Flame, Handshake, Link2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useStore } from "@/lib/store";
 import { formatDate } from "@/lib/utils";
+import type { Person } from "@/lib/types";
 import type { Extraction, MentionResolution } from "@/lib/nl-types";
 
 interface Props {
@@ -98,10 +101,10 @@ export function NLPreview({ extraction, resolutions, onChangeResolutions, onAppl
                   )}
                 </div>
 
-                {/* If ambiguous, show all candidates as a picker */}
-                {m.candidate_ids.length > 1 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {m.candidate_ids.map((id) => {
+                {/* Candidate quick-pick (when LLM proposed >1) + always-available "search any contact" picker */}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {m.candidate_ids.length > 1 &&
+                    m.candidate_ids.map((id) => {
                       const p = peopleById.get(id);
                       const selected = r?.kind === "existing" && r.personId === id;
                       return (
@@ -119,8 +122,12 @@ export function NLPreview({ extraction, resolutions, onChangeResolutions, onAppl
                         </button>
                       );
                     })}
-                  </div>
-                )}
+                  <DirectoryPicker
+                    people={people}
+                    selectedId={r?.kind === "existing" ? r.personId : undefined}
+                    onPick={(id) => set(m.text, { kind: "existing", personId: id })}
+                  />
+                </div>
               </div>
             );
           })}
@@ -328,5 +335,62 @@ function Pill({
       {icon}
       {label}
     </button>
+  );
+}
+
+/** Searchable picker over the full directory, used to override the LLM's
+ *  per-mention resolution when none of the candidates match. */
+function DirectoryPicker({
+  people,
+  selectedId,
+  onPick,
+}: {
+  people: Person[];
+  selectedId: string | undefined;
+  onPick: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="inline-flex items-center gap-1 rounded border border-dashed border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-secondary/60"
+        >
+          <Search className="h-3 w-3" />
+          Buscar contacto…
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[320px] p-0">
+        <Command>
+          <CommandInput placeholder="Nombre, empresa, alias…" />
+          <CommandList>
+            <CommandEmpty>Sin resultados.</CommandEmpty>
+            {people
+              .filter((p) => !p.archived)
+              .slice(0, 200)
+              .map((p) => (
+                <CommandItem
+                  key={p.id}
+                  value={`${p.fullName} ${p.company ?? ""} ${(p.aliases ?? []).join(" ")} ${(p.tags ?? []).join(" ")}`}
+                  onSelect={() => {
+                    onPick(p.id);
+                    setOpen(false);
+                  }}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px]">{p.fullName}</div>
+                    {(p.company || p.role) && (
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {[p.role, p.company].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
+                  </div>
+                  {p.id === selectedId && <Check className="h-3 w-3 text-accent" />}
+                </CommandItem>
+              ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
