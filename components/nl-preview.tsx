@@ -169,14 +169,21 @@ export function NLPreview({ extraction, resolutions, onChangeResolutions, onAppl
       {extraction.promises.length > 0 && (
         <Section title="Compromisos" icon={<Handshake className="h-3.5 w-3.5" />}>
           {extraction.promises.map((pr, i) => {
-            const skipped = !includedTexts.has(pr.person_text);
+            const allTexts = [pr.person_text, ...(pr.also_person_texts ?? [])];
+            const skipped = !allTexts.some((t) => includedTexts.has(t));
+            const names = allTexts.map(nameForText).filter(Boolean);
             return (
               <FactRow key={i} skipped={skipped}>
                 <Badge variant={pr.direction === "yo-a-el" ? "accent" : "default"}>
                   {pr.direction === "yo-a-el" ? "yo → él" : "él → yo"}
                 </Badge>{" "}
-                <strong>{nameForText(pr.person_text)}</strong>: {pr.description}
+                <strong>{names.join(", ")}</strong>: {pr.description}
                 {pr.due_date && <span className="text-muted-foreground"> · vence {formatDate(pr.due_date)}</span>}
+                {names.length > 1 && (
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    Una sola promesa para {names.length} personas. Al marcarla como hecha se cierra para todos.
+                  </div>
+                )}
               </FactRow>
             );
           })}
@@ -360,18 +367,28 @@ function DirectoryPicker({
           Buscar contacto…
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[320px] p-0">
-        <Command>
-          <CommandInput placeholder="Nombre, empresa, alias…" />
+      <PopoverContent
+        align="start"
+        className="w-[320px] p-0"
+        // Inside a Dialog, Radix Popover and Dialog fight over the focus
+        // ring. Disable Popover's auto-focus so cmdk's input gets focus
+        // cleanly and arrow keys / Enter work as expected.
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <Command
+          // cmdk uses each item's `value` to filter; "Mateo" should match
+          // "Mateo Bodenlle Villarino" etc. Default fuzzy filter is fine.
+          loop
+        >
+          <CommandInput placeholder="Nombre, empresa, alias…" autoFocus />
           <CommandList>
             <CommandEmpty>Sin resultados.</CommandEmpty>
             {people
               .filter((p) => !p.archived)
-              .slice(0, 200)
               .map((p) => (
                 <CommandItem
                   key={p.id}
-                  value={`${p.fullName} ${p.company ?? ""} ${(p.aliases ?? []).join(" ")} ${(p.tags ?? []).join(" ")}`}
+                  value={`${p.fullName} ${p.company ?? ""} ${p.role ?? ""} ${(p.aliases ?? []).join(" ")} ${(p.tags ?? []).join(" ")}`}
                   onSelect={() => {
                     onPick(p.id);
                     setOpen(false);
