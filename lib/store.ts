@@ -157,7 +157,7 @@ export const useStore = create<Database & SyncState & Actions>()((set, get) => (
       encounters: s.encounters.filter((e) => e.personId === id),
       interactions: s.interactions.filter((i) => i.personId === id),
       painPoints: s.painPoints.filter((p) => p.personId === id),
-      promises: s.promises.filter((p) => p.personId === id),
+      promises: s.promises.filter((p) => p.personId === id || (p.alsoPersonIds ?? []).includes(id)),
       edges: s.edges.filter((e) => e.fromPersonId === id || e.toPersonId === id),
     };
     set({
@@ -165,7 +165,13 @@ export const useStore = create<Database & SyncState & Actions>()((set, get) => (
       encounters: s.encounters.filter((e) => e.personId !== id),
       interactions: s.interactions.filter((i) => i.personId !== id),
       painPoints: s.painPoints.filter((p) => p.personId !== id),
-      promises: s.promises.filter((p) => p.personId !== id),
+      promises: s.promises
+        .map((p) =>
+          (p.alsoPersonIds ?? []).includes(id)
+            ? { ...p, alsoPersonIds: (p.alsoPersonIds ?? []).filter((x) => x !== id) }
+            : p
+        )
+        .filter((p) => p.personId !== id),
       edges: s.edges.filter((e) => e.fromPersonId !== id && e.toPersonId !== id),
     });
     syncFireAndForget("borrar contacto", () => deletePersonAction(id));
@@ -382,7 +388,8 @@ export function useDerived() {
     getInteractionsByPerson: (pid: string) =>
       db.interactions.filter((i) => i.personId === pid).sort((a, b) => b.date.localeCompare(a.date)),
     getPainPointsByPerson: (pid: string) => db.painPoints.filter((p) => p.personId === pid),
-    getPromisesByPerson: (pid: string) => db.promises.filter((p) => p.personId === pid),
+    getPromisesByPerson: (pid: string) =>
+      db.promises.filter((p) => p.personId === pid || (p.alsoPersonIds ?? []).includes(pid)),
     getEdgesForPerson: (pid: string) =>
       db.edges.filter((e) => e.fromPersonId === pid || e.toPersonId === pid),
     getPeopleByEvent: (eid: string) => {

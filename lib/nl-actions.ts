@@ -224,9 +224,13 @@ export async function applyPlan(plan: ConfirmedPlan): Promise<ApplyResult> {
   for (const pr of plan.promises) {
     const personId = resolve(pr.person_text);
     if (!personId) continue;
+    const alsoPersonIds = (pr.also_person_texts ?? [])
+      .map((t) => resolve(t))
+      .filter((id): id is string => !!id && id !== personId);
     const row: DomainPromise = {
       id: randomUUID(),
       personId,
+      alsoPersonIds: alsoPersonIds.length ? alsoPersonIds : undefined,
       description: pr.description,
       direction: pr.direction,
       dueDate: pr.due_date ?? undefined,

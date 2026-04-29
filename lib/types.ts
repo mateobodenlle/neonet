@@ -55,7 +55,14 @@ export interface PainPoint {
 
 export interface Promise {
   id: string;
+  /** Primary person — kept as a singleton for backward compatibility and
+   *  cheap "promises by person X" queries on the primary side. */
   personId: string;
+  /** Additional people the same promise also applies to. The promise is a
+   *  single toggleable unit: marking it done closes it for everyone.
+   *  Optional in the type so legacy mock entries and old client state stay
+   *  valid; mappers normalise to [] when reading from DB. */
+  alsoPersonIds?: string[];
   description: string;
   direction: "yo-a-el" | "el-a-mi";
   dueDate?: string;
