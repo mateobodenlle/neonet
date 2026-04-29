@@ -47,6 +47,7 @@ export function PromiseDialog({
     } else {
       addPromise({
         id: `pr-${Date.now()}`,
+        alsoPersonIds: [],
         done: false,
         createdAt: new Date().toISOString(),
         ...patch,

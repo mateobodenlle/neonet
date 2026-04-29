@@ -70,9 +70,10 @@ export const EXTRACTION_SCHEMA = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["person_text", "description", "direction", "due_date"],
+          required: ["person_text", "also_person_texts", "description", "direction", "due_date"],
           properties: {
             person_text: { type: "string" },
+            also_person_texts: { type: "array", items: { type: "string" } },
             description: { type: "string" },
             direction: { type: "string", enum: ["yo-a-el", "el-a-mi"] },
             due_date: { type: ["string", "null"] },
@@ -172,8 +173,9 @@ export function systemPrompt(today: string, directory: string): string {
     "7. `connections.kind` solo puede ser uno de: `presentado-por`, `conoce`, `trabaja-con`, `familiar`, `inversor-de`. Si la nota dice \"X me presentó a Y\", crea `from=Y, to=X, kind=presentado-por` (Y fue presentado por X).",
     "8. **No inventes contexto**: si la nota no menciona un pain point, no lo crees. Mejor dejar el array vacío que rellenar con suposiciones.",
     "9. `warnings`: usa este array para flagear cualquier ambigüedad que el usuario debería resolver (ej. \"Hay 5 Pablos en tu red, no pude desambiguar\").",
-    "10. **Acciones que involucran a varias personas**: si una sola promesa, encuentro o pain point afecta a varias personas (ej. \"le mando el deck a Pablo y a Judit\", \"quedé con A y B\", \"a los dos les preocupa la migración\"), emite **una entrada por persona** en el array correspondiente, replicando el contexto. La estructura es 1 fila = 1 persona; si un compromiso es con 3 personas, hay 3 filas.",
-    "11. **Si una mención no tiene un nombre identificable** (\"el de marketing\", \"su CTO\", \"un amigo\"), deja `candidate_ids` vacío Y `proposed_new` en null, y mete un warning. NO inventes nombres como \"CTO de X\".",
+    "10. **Compromisos que aplican a varias personas**: una promesa es un único elemento que se cumple a la vez para todos los destinatarios. Si una sola promesa aplica a varias personas (ej. \"le mando el deck a Pablo y a Judit\"), emite **una sola promesa**, con `person_text` igual a la primera persona y el resto en `also_person_texts`. NO repitas la promesa por persona — quiere completarla con un solo clic.",
+    "11. Para encuentros y pain points, si afectan claramente a varias personas en el mismo contexto (ej. \"quedé con A y B\", \"a los dos les preocupa la migración\"), emite una entrada por persona replicando el contexto.",
+    "12. **Si una mención no tiene un nombre identificable** (\"el de marketing\", \"su CTO\", \"un amigo\"), deja `candidate_ids` vacío Y `proposed_new` en null, y mete un warning. NO inventes nombres como \"CTO de X\".",
     "",
     "## Contactos existentes del usuario (id | nombre [/alias] | empresa – rol | tags)",
     "",

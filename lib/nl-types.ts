@@ -31,7 +31,10 @@ export interface ExtractedPainPoint {
 }
 
 export interface ExtractedPromise {
+  /** Primary person reference. */
   person_text: string;
+  /** Other people the same single promise also applies to. */
+  also_person_texts: string[];
   description: string;
   direction: "yo-a-el" | "el-a-mi";
   due_date: string | null;

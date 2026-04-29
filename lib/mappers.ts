@@ -180,6 +180,7 @@ export function promiseFromRow(r: PromiseRow): DomainPromise {
   return {
     id: r.id,
     personId: r.person_id,
+    alsoPersonIds: r.also_person_ids ?? [],
     description: r.description,
     direction: r.direction,
     dueDate: r.due_date ?? undefined,
@@ -193,6 +194,7 @@ export function promiseToRow(p: DomainPromise): Omit<PromiseRow, "created_at"> &
   return {
     id: p.id,
     person_id: p.personId,
+    also_person_ids: p.alsoPersonIds ?? [],
     description: p.description,
     direction: p.direction,
     due_date: p.dueDate ?? null,

@@ -112,6 +112,7 @@ export interface PainPointRow {
 export interface PromiseRow {
   id: string;
   person_id: string;
+  also_person_ids: string[];
   description: string;
   direction: "yo-a-el" | "el-a-mi";
   due_date: string | null;
