@@ -29,3 +29,8 @@ next-env.d.ts
 # logs
 *.log
 npm-debug.log*
+
+# imported user data (vcards, linkedin csv exports, ...)
+data/*
+!data/.gitkeep
+!data/README.md
