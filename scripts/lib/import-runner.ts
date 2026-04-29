@@ -29,9 +29,10 @@ export function classify(candidates: Person[], existing: Person[]): ImportResult
   const idx = buildIndex(existing);
   const newRows: Person[] = [];
   const matched: Array<{ candidate: Person; match: Match }> = [];
-  // Also dedup within the candidate batch itself (same person twice in vCard).
+  // Also dedup within the candidate batch itself (same person twice in source).
   const seenEmails = new Set<string>();
   const seenPhones = new Set<string>();
+  const seenLinkedin = new Set<string>();
 
   for (const c of candidates) {
     const m = findMatch(c, idx);
@@ -39,18 +40,16 @@ export function classify(candidates: Person[], existing: Person[]): ImportResult
       matched.push({ candidate: c, match: m });
       continue;
     }
-    // Self-dedup within this batch.
     const e = c.handles?.email?.toLowerCase().trim();
     const p = c.handles?.phone?.replace(/[^\d+]/g, "");
-    if ((e && seenEmails.has(e)) || (p && seenPhones.has(p))) {
-      matched.push({
-        candidate: c,
-        match: { existing: c, reason: "email" }, // self-collision flagged as match
-      });
+    const li = c.handles?.linkedin?.toLowerCase().trim();
+    if ((e && seenEmails.has(e)) || (p && seenPhones.has(p)) || (li && seenLinkedin.has(li))) {
+      matched.push({ candidate: c, match: { existing: c, reason: "email" } });
       continue;
     }
     if (e) seenEmails.add(e);
     if (p) seenPhones.add(p);
+    if (li) seenLinkedin.add(li);
     newRows.push(c);
   }
   return { total: candidates.length, newRows, matched, invalid: [] };
