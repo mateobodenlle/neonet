@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useStore } from "@/lib/store";
-import { extractFromNote, applyPlan } from "@/lib/nl-actions";
+import { extractFromNote, extractForPerson, applyPlan } from "@/lib/nl-actions";
 import type { Extraction, ConfirmedPlan, MentionResolution } from "@/lib/nl-types";
 import { NLPreview } from "./nl-preview";
 
@@ -23,9 +23,14 @@ interface Props {
   placeholder?: string;
   /** Smaller height variant for dashboard card. */
   compact?: boolean;
+  /**
+   * If set, the extraction treats this person as the implicit subject of any
+   * subjectless statement in the note (used on the contact detail page).
+   */
+  subjectPersonId?: string;
 }
 
-export function NLInput({ onClose, placeholder, compact }: Props) {
+export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Props) {
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const hydrate = useStore((s) => s.hydrate);
@@ -35,7 +40,9 @@ export function NLInput({ onClose, placeholder, compact }: Props) {
     setPhase({ kind: "extracting" });
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const extraction = await extractFromNote(text, today);
+      const extraction = subjectPersonId
+        ? await extractForPerson(text, subjectPersonId, today)
+        : await extractFromNote(text, today);
       // Default resolutions: take LLM's first suggestion per mention.
       const resolutions: Record<string, MentionResolution> = {};
       for (const m of extraction.mentions) {
