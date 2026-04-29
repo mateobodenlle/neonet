@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { PersonAvatar } from "@/components/person-avatar";
 import { CalendarDays, Users, MessageSquare, TriangleAlert, Plus } from "lucide-react";
@@ -56,6 +56,7 @@ export function CommandPalette() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-xl overflow-hidden p-0">
+        <DialogTitle className="sr-only">Buscar</DialogTitle>
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Buscar contactos, empresas, pain points, notas..."
