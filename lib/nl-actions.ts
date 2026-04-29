@@ -46,21 +46,55 @@ async function loadDirectory(): Promise<DirectoryRow[]> {
   return (data ?? []) as DirectoryRow[];
 }
 
-export async function extractFromNote(text: string, today: string): Promise<Extraction> {
-  if (!text.trim()) throw new Error("Empty note");
-  const directory = await loadDirectory();
+async function runExtraction(systemContent: string, userText: string): Promise<Extraction> {
   const completion = await openai.chat.completions.create({
     model: EXTRACTION_MODEL,
     temperature: 0.1,
     response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA as never },
     messages: [
-      { role: "system", content: systemPrompt(today, compactDirectory(directory)) },
-      { role: "user", content: text.trim() },
+      { role: "system", content: systemContent },
+      { role: "user", content: userText.trim() },
     ],
   });
   const raw = completion.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
   return JSON.parse(raw) as Extraction;
+}
+
+export async function extractFromNote(text: string, today: string): Promise<Extraction> {
+  if (!text.trim()) throw new Error("Empty note");
+  const directory = await loadDirectory();
+  return runExtraction(systemPrompt(today, compactDirectory(directory)), text);
+}
+
+/**
+ * Variant of extractFromNote where every "subjectless" statement (e.g.
+ * "trabaja en Idealista", "le interesa la IA aplicada al retail") is treated
+ * as referring to a specific person — typically the contact whose detail
+ * page the user is on. Other named people in the text still go through the
+ * normal directory disambiguation.
+ */
+export async function extractForPerson(
+  text: string,
+  personId: string,
+  today: string
+): Promise<Extraction> {
+  if (!text.trim()) throw new Error("Empty note");
+  const directory = await loadDirectory();
+  const subject = directory.find((d) => d.id === personId);
+  if (!subject) throw new Error(`Subject person not found: ${personId}`);
+
+  const baseSystem = systemPrompt(today, compactDirectory(directory));
+  const subjectAddendum = [
+    "",
+    "## Sujeto implícito de la nota",
+    "",
+    `Esta nota es sobre **${subject.full_name}** (id=\`${subject.id}\`).`,
+    "Cualquier afirmación sin sujeto explícito (\"trabaja en X\", \"le interesa Y\", \"está casado con Z\") se refiere a esta persona — usa el nombre EXACTO arriba como `person_text`, y pon su id en `candidate_ids`.",
+    "Otros nombres mencionados en la nota se resuelven contra el directorio como siempre.",
+  ].join("\n");
+
+  return runExtraction(baseSystem + "\n" + subjectAddendum, text);
 }
 
 // ---------- apply ----------
