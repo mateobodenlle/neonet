@@ -162,4 +162,18 @@ Ver `CONTRIBUTING.md` para estándares de commits, branching, versionado y autor
 
 ## Rama actual
 
-`feat/nl-input` — añade caja NL por contacto en la ficha, soporte multi-persona en promesas, closeness atemporal en personas, picker de directorio dentro de diálogos.
+`feat/observations-architecture` — refactor mayor: append-only `observations` + `observation_participants` + `person_profiles` con embeddings (pgvector HNSW). Extracción NL v2 emite observaciones atómicas con facets libres + roles de participantes + supersedes. Síntesis de perfil vía endpoint `/api/jobs/synthesize`. Tablas legacy `pain_points` / `promises` eliminadas (migración 0006); UI dialogs/listas que las usaban quedan como vacías hasta UI cleanup posterior.
+
+### Eval
+
+- `npx tsx scripts/eval-extraction.ts` — corre `data/eval/extraction-cases.jsonl` contra el extractor v2 y valida observaciones, mentions, facets y person_updates esperados.
+- `npx tsx scripts/eval-synthesis.ts` — corre casos de síntesis sintética sin tocar BD.
+
+### Job de síntesis
+
+```bash
+curl -X POST http://localhost:3000/api/jobs/synthesize \
+  -H "Content-Type: application/json" \
+  -H "x-job-secret: $JOB_SECRET" \
+  -d '{"mode":"process-dirty","batchSize":5}'
+```

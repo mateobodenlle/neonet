@@ -34,6 +34,7 @@ npm-debug.log*
 data/*
 !data/.gitkeep
 !data/README.md
+!data/eval/
 
 # DB backups
 backups/
