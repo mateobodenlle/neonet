@@ -16,6 +16,10 @@ import type {
   Sector,
   Seniority,
   InteractionKind,
+  Observation,
+  ObservationParticipant,
+  ObservationRole,
+  PersonProfile,
 } from "./types";
 import type {
   PersonRow,
@@ -25,7 +29,23 @@ import type {
   PainPointRow,
   PromiseRow,
   EdgeRow,
+  ObservationRow,
+  ObservationParticipantRow,
+  PersonProfileRow,
 } from "./types-db";
+
+// pgvector wire format: "[0.1,0.2,...]". null when not embedded yet.
+function parseVector(v: string | null): number[] | undefined {
+  if (!v) return undefined;
+  const trimmed = v.trim();
+  if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) return undefined;
+  return trimmed.slice(1, -1).split(",").map(Number);
+}
+
+export function vectorToWire(v: number[] | undefined): string | null {
+  if (!v || v.length === 0) return null;
+  return `[${v.join(",")}]`;
+}
 
 // people ----------------------------------------------------------------
 export function personFromRow(r: PersonRow): Person {
@@ -49,6 +69,7 @@ export function personFromRow(r: PersonRow): Person {
     trust: (r.trust ?? undefined) as Person["trust"],
     nextStep: r.next_step ?? undefined,
     archived: r.archived,
+    autoCreated: r.auto_created ?? false,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -75,6 +96,7 @@ export function personToRow(p: Person): PersonRow {
     trust: p.trust ?? null,
     next_step: p.nextStep ?? null,
     archived: p.archived ?? false,
+    auto_created: p.autoCreated ?? false,
     created_at: p.createdAt,
     updated_at: p.updatedAt,
   };
@@ -225,5 +247,94 @@ export function edgeToRow(e: Edge): Omit<EdgeRow, "created_at"> {
     to_person_id: e.toPersonId,
     kind: e.kind,
     note: e.note ?? null,
+  };
+}
+
+// observations ---------------------------------------------------------
+export function observationFromRow(r: ObservationRow): Observation {
+  return {
+    id: r.id,
+    primaryPersonId: r.primary_person_id,
+    content: r.content,
+    observedAt: r.observed_at,
+    source: r.source,
+    tags: r.tags ?? [],
+    facets: r.facets ?? {},
+    supersededBy: r.superseded_by ?? undefined,
+    embedding: parseVector(r.embedding),
+    embeddingModel: r.embedding_model ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+export function observationToRow(
+  o: Observation
+): Omit<ObservationRow, "created_at"> & { created_at?: string } {
+  return {
+    id: o.id,
+    primary_person_id: o.primaryPersonId,
+    content: o.content,
+    observed_at: o.observedAt,
+    source: o.source,
+    tags: o.tags ?? [],
+    facets: o.facets ?? {},
+    superseded_by: o.supersededBy ?? null,
+    embedding: vectorToWire(o.embedding),
+    embedding_model: o.embeddingModel ?? null,
+    created_at: o.createdAt,
+  };
+}
+
+export function observationParticipantFromRow(
+  r: ObservationParticipantRow
+): ObservationParticipant {
+  return {
+    observationId: r.observation_id,
+    personId: r.person_id,
+    role: r.role as ObservationRole,
+  };
+}
+
+export function observationParticipantToRow(
+  p: ObservationParticipant
+): ObservationParticipantRow {
+  return {
+    observation_id: p.observationId,
+    person_id: p.personId,
+    role: p.role,
+  };
+}
+
+// person_profiles -------------------------------------------------------
+export function personProfileFromRow(r: PersonProfileRow): PersonProfile {
+  return {
+    personId: r.person_id,
+    narrative: r.narrative,
+    resolvedFacts: r.resolved_facts ?? {},
+    recurringThemes: r.recurring_themes ?? [],
+    activeThreads: r.active_threads ?? [],
+    embedding: parseVector(r.embedding),
+    embeddingModel: r.embedding_model ?? undefined,
+    lastSynthesizedAt: r.last_synthesized_at ?? undefined,
+    observationsAtSynthesis: r.observations_at_synthesis ?? 0,
+    dirtySince: r.dirty_since ?? undefined,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function personProfileToRow(
+  p: PersonProfile
+): Omit<PersonProfileRow, "updated_at"> {
+  return {
+    person_id: p.personId,
+    narrative: p.narrative,
+    resolved_facts: p.resolvedFacts ?? {},
+    recurring_themes: p.recurringThemes ?? [],
+    active_threads: p.activeThreads ?? [],
+    embedding: vectorToWire(p.embedding),
+    embedding_model: p.embeddingModel ?? null,
+    last_synthesized_at: p.lastSynthesizedAt ?? null,
+    observations_at_synthesis: p.observationsAtSynthesis ?? 0,
+    dirty_since: p.dirtySince ?? null,
   };
 }

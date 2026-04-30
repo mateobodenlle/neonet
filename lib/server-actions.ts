@@ -26,6 +26,9 @@ import {
   promiseToRow,
   edgeFromRow,
   edgeToRow,
+  observationToRow,
+  observationParticipantToRow,
+  personProfileToRow,
 } from "./mappers";
 import type {
   Person,
@@ -36,6 +39,9 @@ import type {
   Promise as DomainPromise,
   Edge,
   Database,
+  Observation,
+  ObservationParticipant,
+  PersonProfile,
 } from "./types";
 
 const day = (s: string) => s.slice(0, 10);
@@ -280,4 +286,68 @@ export async function deleteEdgeAction(id: string): Promise<void> {
 
 export async function restoreEdgeAction(e: Edge): Promise<void> {
   await persistEdge(e);
+}
+
+// observations ---------------------------------------------------------
+export async function persistObservation(o: Observation): Promise<void> {
+  const row = { ...observationToRow(o), observed_at: day(o.observedAt) };
+  const { error } = await supabaseAdmin
+    .from("observations")
+    .upsert(row, { onConflict: "id" });
+  check(error);
+}
+
+export async function persistObservationParticipants(
+  participants: ObservationParticipant[]
+): Promise<void> {
+  if (participants.length === 0) return;
+  const rows = participants.map(observationParticipantToRow);
+  const { error } = await supabaseAdmin
+    .from("observation_participants")
+    .upsert(rows, { onConflict: "observation_id,person_id,role" });
+  check(error);
+}
+
+export async function deleteObservationAction(id: string): Promise<void> {
+  // FK cascade removes observation_participants.
+  const { error } = await supabaseAdmin.from("observations").delete().eq("id", id);
+  check(error);
+}
+
+export async function applySupersede(
+  oldId: string,
+  newId: string
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("observations")
+    .update({ superseded_by: newId })
+    .eq("id", oldId);
+  check(error);
+}
+
+export async function persistProfile(p: PersonProfile): Promise<void> {
+  const row = personProfileToRow(p);
+  const { error } = await supabaseAdmin
+    .from("person_profiles")
+    .upsert(row, { onConflict: "person_id" });
+  check(error);
+}
+
+export async function markPersonProfileDirty(personIds: string[]): Promise<void> {
+  if (personIds.length === 0) return;
+  const now = new Date().toISOString();
+  // Use upsert semantics: insert empty profile if missing, set dirty_since
+  // unconditionally so a dormant profile becomes dirty too.
+  const rows = personIds.map((id) => ({
+    person_id: id,
+    dirty_since: now,
+  }));
+  const { error } = await supabaseAdmin
+    .from("person_profiles")
+    .upsert(rows, { onConflict: "person_id" });
+  check(error);
+  // upsert won't overwrite existing dirty_since with the new value if onConflict
+  // does merge — Supabase merges all provided columns, so dirty_since is
+  // updated. Confirmed via docs (postgrest upsert = ON CONFLICT DO UPDATE SET
+  // every provided column).
 }
