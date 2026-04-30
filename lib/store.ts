@@ -16,6 +16,7 @@ import {
   hydrate as hydrateAction,
   persistPerson,
   deletePersonAction,
+  deletePersonsAction,
   restorePersonAction,
   archivePersonAction,
   persistEncounter,
@@ -59,6 +60,7 @@ interface Actions {
   addPerson: (p: Person) => void;
   updatePerson: (id: string, patch: Partial<Person>) => void;
   deletePerson: (id: string) => RelatedSnapshot | null;
+  bulkDeletePeople: (ids: string[]) => number;
   restorePerson: (person: Person, related: RelatedSnapshot) => void;
   archivePerson: (id: string, archived: boolean) => void;
 
@@ -176,6 +178,32 @@ export const useStore = create<Database & SyncState & Actions>()((set, get) => (
     });
     syncFireAndForget("borrar contacto", () => deletePersonAction(id));
     return related;
+  },
+  bulkDeletePeople: (ids) => {
+    if (ids.length === 0) return 0;
+    const idSet = new Set(ids);
+    const s = get();
+    const removed = s.people.filter((p) => idSet.has(p.id));
+    if (removed.length === 0) return 0;
+    set({
+      people: s.people.filter((p) => !idSet.has(p.id)),
+      encounters: s.encounters.filter((e) => !idSet.has(e.personId)),
+      interactions: s.interactions.filter((i) => !idSet.has(i.personId)),
+      painPoints: s.painPoints.filter((p) => !idSet.has(p.personId)),
+      promises: s.promises
+        .map((p) => ({
+          ...p,
+          alsoPersonIds: (p.alsoPersonIds ?? []).filter((x) => !idSet.has(x)),
+        }))
+        .filter((p) => !idSet.has(p.personId)),
+      edges: s.edges.filter(
+        (e) => !idSet.has(e.fromPersonId) && !idSet.has(e.toPersonId)
+      ),
+    });
+    syncFireAndForget("borrar contactos", () =>
+      deletePersonsAction(removed.map((p) => p.id))
+    );
+    return removed.length;
   },
   restorePerson: (person, related) => {
     set((s) => ({

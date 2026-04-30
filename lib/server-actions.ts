@@ -85,8 +85,14 @@ export async function persistPerson(p: Person): Promise<void> {
 }
 
 export async function deletePersonAction(id: string): Promise<void> {
-  // FK cascade handles encounters, interactions, pain_points, promises, edges.
+  // FK cascade handles encounters, interactions, observations, edges.
   const { error } = await supabaseAdmin.from("people").delete().eq("id", id);
+  check(error);
+}
+
+export async function deletePersonsAction(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabaseAdmin.from("people").delete().in("id", ids);
   check(error);
 }
 
