@@ -14,6 +14,7 @@ import { PersonAvatar } from "@/components/person-avatar";
 import { TemperaturePicker } from "@/components/temperature-picker";
 import { ClosenessPicker } from "@/components/closeness-picker";
 import { NLInputPersonCard } from "@/components/nl-input-person-card";
+import { PersonObservationsCard } from "@/components/person-observations-card";
 import { CategoryPicker } from "@/components/category-picker";
 import { TagsEditor } from "@/components/tags-editor";
 import { ContactDialog } from "@/components/add-contact-dialog";
@@ -215,6 +216,8 @@ export default function ContactDetailPage() {
       </div>
 
       <NLInputPersonCard personId={person.id} personName={person.fullName} />
+
+      <PersonObservationsCard personId={person.id} />
 
       {/* Main grid */}
       <div className="grid gap-6 lg:grid-cols-3">

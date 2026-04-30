@@ -35,9 +35,8 @@ import {
 import type {
   ExtractionV2,
   ConfirmedPlanV2,
-  ExtractedObservationV2,
+  ExtractedPersonUpdateV2,
   ProposedNewPerson,
-  PersonMention,
 } from "./nl-types";
 import type {
   Person,
@@ -264,26 +263,11 @@ function pickField(
   field: ExtractedPersonUpdateV2["field"],
   value: string
 ): void {
-  switch (field) {
-    case "company":
-    case "role":
-    case "location":
-    case "next_step":
-    case "category":
-    case "temperature":
-    case "closeness":
-      patch[
-        field === "next_step" ? "next_step" : field
-      ] = value;
-      break;
-    case "interests":
-    case "tags":
-      // arrays — handled separately
-      break;
-  }
+  // The enum values match people.* column names 1:1 (next_step already
+  // snake-cased). Arrays are handled by the caller.
+  if (field === "interests" || field === "tags") return;
+  patch[field] = value;
 }
-
-import type { ExtractedPersonUpdateV2 } from "./nl-types";
 
 function parseFacets(raw: string): Record<string, unknown> {
   if (!raw) return {};
@@ -446,18 +430,3 @@ export async function applyPlanV2(
   };
 }
 
-// ---------- helpers exported for the preview UI ----------
-
-/** Collects every unique mention.text across observations + person_updates. */
-export function collectMentionsV2(extraction: ExtractionV2): PersonMention[] {
-  const byText = new Map<string, PersonMention>();
-  const add = (m: PersonMention) => {
-    if (!byText.has(m.text)) byText.set(m.text, m);
-  };
-  for (const o of extraction.observations) {
-    add(o.primary_mention);
-    for (const p of o.participants) add(p.mention);
-  }
-  for (const u of extraction.person_updates) add(u.primary_mention);
-  return [...byText.values()];
-}
