@@ -97,3 +97,61 @@ export interface ConfirmedPlan {
   /** Optional event id chosen for encounters that map to one of the existing events. */
   encounterEventIdByText?: Record<string, string>;
 }
+
+// ============================================================
+// v2 — observation-based extraction (parallel to v1 above)
+// ============================================================
+
+export type ParticipantRoleV2 =
+  | "co_subject"
+  | "related"
+  | "source"
+  | "mentioned"
+  | "promise_target";
+
+export interface ExtractedParticipantV2 {
+  mention: PersonMention;
+  role: ParticipantRoleV2;
+}
+
+export interface SupersedesHintV2 {
+  reason: string;
+  candidate_observation_ids: string[];
+}
+
+export interface ExtractedObservationV2 {
+  content: string;
+  observed_at: string;
+  primary_mention: PersonMention;
+  participants: ExtractedParticipantV2[];
+  tags: string[];
+  facets: { raw: string };
+  supersedes_hint: SupersedesHintV2 | null;
+}
+
+export interface ExtractedPersonUpdateV2 {
+  primary_mention: PersonMention;
+  field: ExtractedPersonUpdate["field"];
+  new_value: string;
+}
+
+export interface ExtractionV2 {
+  observations: ExtractedObservationV2[];
+  events: ExtractedEvent[];
+  person_updates: ExtractedPersonUpdateV2[];
+  warnings: string[];
+  summary: string;
+}
+
+/** A single mention.text → resolution entry, keyed by text in the plan map. */
+export interface ConfirmedPlanV2 {
+  noteText: string;
+  /** Resolution per mention.text. The same text may appear in primary_mention
+   *  and inside participants — they share the same key. */
+  resolutions: Record<string, MentionResolution>;
+  observations: ExtractedObservationV2[];
+  events: ExtractedEvent[];
+  person_updates: ExtractedPersonUpdateV2[];
+  /** observation_index → array of confirmed superseded observation ids. */
+  supersedes?: Record<number, string[]>;
+}
