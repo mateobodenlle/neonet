@@ -40,6 +40,21 @@ export interface Database {
         Insert: Partial<EdgeRow> & Pick<EdgeRow, "from_person_id" | "to_person_id" | "kind">;
         Update: Partial<EdgeRow>;
       };
+      observations: {
+        Row: ObservationRow;
+        Insert: Partial<ObservationRow> & Pick<ObservationRow, "primary_person_id" | "content" | "observed_at" | "source">;
+        Update: Partial<ObservationRow>;
+      };
+      observation_participants: {
+        Row: ObservationParticipantRow;
+        Insert: ObservationParticipantRow;
+        Update: Partial<ObservationParticipantRow>;
+      };
+      person_profiles: {
+        Row: PersonProfileRow;
+        Insert: Partial<PersonProfileRow> & Pick<PersonProfileRow, "person_id">;
+        Update: Partial<PersonProfileRow>;
+      };
     };
   };
 }
@@ -64,6 +79,7 @@ export interface PersonRow {
   trust: number | null;
   next_step: string | null;
   archived: boolean;
+  auto_created: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -129,4 +145,48 @@ export interface EdgeRow {
   kind: string;
   note: string | null;
   created_at: string;
+}
+
+export type ObservationRoleValue =
+  | "primary"
+  | "co_subject"
+  | "related"
+  | "source"
+  | "mentioned"
+  | "promise_target";
+
+export interface ObservationRow {
+  id: string;
+  primary_person_id: string;
+  content: string;
+  observed_at: string;
+  source: string;
+  tags: string[];
+  facets: Record<string, unknown>;
+  superseded_by: string | null;
+  // pgvector returns/accepts strings via supabase-js JSON; we keep the wire
+  // shape as string|null here and convert in the embeddings module.
+  embedding: string | null;
+  embedding_model: string | null;
+  created_at: string;
+}
+
+export interface ObservationParticipantRow {
+  observation_id: string;
+  person_id: string;
+  role: ObservationRoleValue;
+}
+
+export interface PersonProfileRow {
+  person_id: string;
+  narrative: string;
+  resolved_facts: Record<string, unknown>;
+  recurring_themes: string[];
+  active_threads: unknown[];
+  embedding: string | null;
+  embedding_model: string | null;
+  last_synthesized_at: string | null;
+  observations_at_synthesis: number;
+  dirty_since: string | null;
+  updated_at: string;
 }
