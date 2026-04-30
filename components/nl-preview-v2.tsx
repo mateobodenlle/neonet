@@ -113,10 +113,23 @@ export function NLPreviewV2({
         <Section title="Personas mencionadas">
           {mentions.map((m) => {
             const r = resolutions[m.text];
+            const conf = m.confidence ?? "medium";
             return (
-              <div key={m.text} className="rounded-md border border-border bg-card px-3 py-2.5">
+              <div
+                key={m.text}
+                className={`rounded-md border bg-card px-3 py-2.5 ${
+                  conf === "low"
+                    ? "border-amber-500/40"
+                    : conf === "medium"
+                    ? "border-border"
+                    : "border-border/50"
+                }`}
+              >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-[13px] font-medium">&quot;{m.text}&quot;</div>
+                  <div className="flex items-center gap-2 text-[13px] font-medium">
+                    &quot;{m.text}&quot;
+                    <ConfidenceBadge confidence={conf} />
+                  </div>
                   <ResolutionPills
                     resolution={r}
                     candidateIds={m.candidate_ids}
@@ -148,32 +161,49 @@ export function NLPreviewV2({
                     </>
                   )}
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {m.candidate_ids.length > 1 &&
-                    m.candidate_ids.map((id) => {
-                      const p = peopleById.get(id);
-                      const selected = r?.kind === "existing" && r.personId === id;
-                      return (
-                        <button
-                          key={id}
-                          onClick={() => setResolution(m.text, { kind: "existing", personId: id })}
-                          className={`rounded border px-2 py-0.5 text-[11px] transition-colors ${
-                            selected
-                              ? "border-accent bg-accent/10 text-accent"
-                              : "border-border bg-background hover:bg-secondary/60"
-                          }`}
-                        >
-                          {p?.fullName ?? id.slice(0, 8)}
-                          {p?.company && <span className="text-muted-foreground"> · {p.company}</span>}
-                        </button>
-                      );
-                    })}
-                  <DirectoryPicker
-                    people={people}
-                    selectedId={r?.kind === "existing" ? r.personId : undefined}
-                    onPick={(id) => setResolution(m.text, { kind: "existing", personId: id })}
-                  />
-                </div>
+                {conf !== "high" && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {m.candidate_ids.length > 1 &&
+                      m.candidate_ids.map((id) => {
+                        const p = peopleById.get(id);
+                        const selected = r?.kind === "existing" && r.personId === id;
+                        return (
+                          <button
+                            key={id}
+                            onClick={() =>
+                              setResolution(m.text, { kind: "existing", personId: id })
+                            }
+                            className={`rounded border px-2 py-0.5 text-[11px] transition-colors ${
+                              selected
+                                ? "border-accent bg-accent/10 text-accent"
+                                : "border-border bg-background hover:bg-secondary/60"
+                            }`}
+                          >
+                            {p?.fullName ?? id.slice(0, 8)}
+                            {p?.company && <span className="text-muted-foreground"> · {p.company}</span>}
+                          </button>
+                        );
+                      })}
+                    <DirectoryPicker
+                      people={people}
+                      selectedId={r?.kind === "existing" ? r.personId : undefined}
+                      onPick={(id) =>
+                        setResolution(m.text, { kind: "existing", personId: id })
+                      }
+                    />
+                  </div>
+                )}
+                {conf === "high" && (
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    Asignación automática.{" "}
+                    <button
+                      className="underline hover:text-foreground"
+                      onClick={() => setResolution(m.text, { kind: "skip" })}
+                    >
+                      cambiar
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -312,6 +342,24 @@ export function NLPreviewV2({
         </Button>
       </div>
     </div>
+  );
+}
+
+function ConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low" }) {
+  const styles =
+    confidence === "high"
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+      : confidence === "medium"
+      ? "border-border bg-secondary/60 text-muted-foreground"
+      : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400";
+  const label =
+    confidence === "high" ? "alta" : confidence === "medium" ? "media" : "baja";
+  return (
+    <span
+      className={`inline-flex items-center rounded border px-1 py-0 text-[10px] uppercase tracking-wide ${styles}`}
+    >
+      {label}
+    </span>
   );
 }
 

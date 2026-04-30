@@ -8,13 +8,17 @@ export interface ProposedNewPerson {
   notes: string | null;
 }
 
+export type MentionConfidence = "high" | "medium" | "low";
+
 export interface PersonMention {
   /** The exact text the user used to refer to this person. */
   text: string;
-  /** Existing person IDs the LLM thinks could match, ordered by likelihood. */
+  /** Existing person IDs the LLM thinks could match, ordered by likelihood — first is the LLM's pick. */
   candidate_ids: string[];
   /** If the LLM decided this is probably a new person, a suggested base record. */
   proposed_new: ProposedNewPerson | null;
+  /** How sure the LLM is about its top pick. Drives the preview UI. v2 only. */
+  confidence?: MentionConfidence;
 }
 
 export interface ExtractedEncounter {
