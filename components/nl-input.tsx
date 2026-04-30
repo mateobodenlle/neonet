@@ -6,14 +6,24 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useStore } from "@/lib/store";
-import { extractFromNote, extractForPerson, applyPlan } from "@/lib/nl-actions";
-import type { Extraction, ConfirmedPlan, MentionResolution } from "@/lib/nl-types";
-import { NLPreview } from "./nl-preview";
+import { extractFromNoteV2, extractForPersonV2, applyPlanV2 } from "@/lib/nl-actions-v2";
+import type {
+  ExtractionV2,
+  ConfirmedPlanV2,
+  MentionResolution,
+  PersonMention,
+} from "@/lib/nl-types";
+import { NLPreviewV2 } from "./nl-preview-v2";
 
 type Phase =
   | { kind: "idle" }
   | { kind: "extracting" }
-  | { kind: "preview"; extraction: Extraction; resolutions: Record<string, MentionResolution> }
+  | {
+      kind: "preview";
+      extraction: ExtractionV2;
+      resolutions: Record<string, MentionResolution>;
+      supersedes: Record<number, string[]>;
+    }
   | { kind: "applying" };
 
 interface Props {
@@ -30,6 +40,29 @@ interface Props {
   subjectPersonId?: string;
 }
 
+function collectMentionsLocal(extraction: ExtractionV2): PersonMention[] {
+  const byText = new Map<string, PersonMention>();
+  const add = (m: PersonMention) => {
+    if (!byText.has(m.text)) byText.set(m.text, m);
+  };
+  for (const o of extraction.observations) {
+    add(o.primary_mention);
+    for (const p of o.participants) add(p.mention);
+  }
+  for (const u of extraction.person_updates) add(u.primary_mention);
+  return [...byText.values()];
+}
+
+function defaultResolution(m: PersonMention): MentionResolution {
+  if (m.candidate_ids.length === 1)
+    return { kind: "existing", personId: m.candidate_ids[0] };
+  if (m.candidate_ids.length === 0 && m.proposed_new)
+    return { kind: "new", person: m.proposed_new };
+  if (m.candidate_ids.length > 1)
+    return { kind: "existing", personId: m.candidate_ids[0] };
+  return { kind: "skip" };
+}
+
 export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Props) {
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -41,23 +74,12 @@ export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Prop
     try {
       const today = new Date().toISOString().slice(0, 10);
       const extraction = subjectPersonId
-        ? await extractForPerson(text, subjectPersonId, today)
-        : await extractFromNote(text, today);
-      // Default resolutions: take LLM's first suggestion per mention.
+        ? await extractForPersonV2(text, subjectPersonId, today)
+        : await extractFromNoteV2(text, today);
+      const mentions = collectMentionsLocal(extraction);
       const resolutions: Record<string, MentionResolution> = {};
-      for (const m of extraction.mentions) {
-        if (m.candidate_ids.length === 1) {
-          resolutions[m.text] = { kind: "existing", personId: m.candidate_ids[0] };
-        } else if (m.candidate_ids.length === 0 && m.proposed_new) {
-          resolutions[m.text] = { kind: "new", person: m.proposed_new };
-        } else if (m.candidate_ids.length > 1) {
-          // Ambiguous — leave for the user. Default to the highest-ranked candidate.
-          resolutions[m.text] = { kind: "existing", personId: m.candidate_ids[0] };
-        } else {
-          resolutions[m.text] = { kind: "skip" };
-        }
-      }
-      setPhase({ kind: "preview", extraction, resolutions });
+      for (const m of mentions) resolutions[m.text] = defaultResolution(m);
+      setPhase({ kind: "preview", extraction, resolutions, supersedes: {} });
     } catch (err) {
       console.error(err);
       toast.error("Error extrayendo entidades", {
@@ -69,32 +91,28 @@ export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Prop
 
   async function onApply() {
     if (phase.kind !== "preview") return;
-    const plan: ConfirmedPlan = {
+    const plan: ConfirmedPlanV2 = {
       noteText: text,
       resolutions: phase.resolutions,
-      encounters: phase.extraction.encounters,
-      pain_points: phase.extraction.pain_points,
-      promises: phase.extraction.promises,
-      person_updates: phase.extraction.person_updates,
-      connections: phase.extraction.connections,
+      observations: phase.extraction.observations,
       events: phase.extraction.events,
+      person_updates: phase.extraction.person_updates,
+      supersedes: phase.supersedes,
     };
     setPhase({ kind: "applying" });
     try {
-      const result = await applyPlan(plan);
-      // Refresh local store from server.
+      const result = await applyPlanV2(plan);
       await hydrate();
-      const created = [
+      const parts = [
         result.createdPeople.length && `${result.createdPeople.length} contactos`,
-        result.createdEncounters.length && `${result.createdEncounters.length} encuentros`,
-        result.createdPainPoints.length && `${result.createdPainPoints.length} pain points`,
-        result.createdPromises.length && `${result.createdPromises.length} compromisos`,
-        result.createdEdges.length && `${result.createdEdges.length} conexiones`,
-        result.updatedPeople.length && `${result.updatedPeople.length} actualizaciones`,
-      ]
-        .filter(Boolean)
-        .join(", ");
-      toast.success("Aplicado", { description: created || "Sin cambios" });
+        result.createdObservationIds.length &&
+          `${result.createdObservationIds.length} observaciones`,
+        result.createdEvents.length && `${result.createdEvents.length} eventos`,
+        result.updatedPersonIds.length && `${result.updatedPersonIds.length} actualizaciones`,
+        result.supersededObservationIds.length &&
+          `${result.supersededObservationIds.length} reemplazos`,
+      ].filter(Boolean);
+      toast.success("Aplicado", { description: parts.join(", ") || "Sin cambios" });
       setText("");
       setPhase({ kind: "idle" });
       onClose?.();
@@ -103,10 +121,7 @@ export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Prop
       toast.error("Error aplicando los cambios", {
         description: err instanceof Error ? err.message : String(err),
       });
-      // Stay in preview so user can retry.
-      if (phase.kind === ("applying" as Phase["kind"])) {
-        setPhase({ kind: "idle" });
-      }
+      setPhase({ kind: "idle" });
     }
   }
 
@@ -116,15 +131,19 @@ export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Prop
 
   if (phase.kind === "preview") {
     return (
-      <NLPreview
+      <NLPreviewV2
         extraction={phase.extraction}
         resolutions={phase.resolutions}
         onChangeResolutions={(r) =>
           setPhase((p) => (p.kind === "preview" ? { ...p, resolutions: r } : p))
         }
+        supersedes={phase.supersedes}
+        onChangeSupersedes={(s) =>
+          setPhase((p) => (p.kind === "preview" ? { ...p, supersedes: s } : p))
+        }
         onApply={onApply}
         onDiscard={onDiscard}
-        applying={(phase as Phase).kind === "applying"}
+        applying={false}
       />
     );
   }
@@ -158,7 +177,7 @@ export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Prop
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Sparkles className="h-3 w-3" />
-          Texto libre. Personas, encuentros, pain points, promesas...
+          Texto libre. Personas, hechos, promesas, contexto…
           <kbd className="ml-1 rounded border border-border bg-secondary px-1 text-[10px]">⌘↵</kbd>
           <span className="ml-1">o atajo global</span>
           <kbd className="ml-1 rounded border border-border bg-secondary px-1 text-[10px]">⌘⇧ J</kbd>
