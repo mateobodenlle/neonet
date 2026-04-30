@@ -22,7 +22,7 @@ const facetsField = {
 const mentionField = {
   type: "object",
   additionalProperties: false,
-  required: ["text", "candidate_ids", "proposed_new"],
+  required: ["text", "candidate_ids", "proposed_new", "confidence"],
   properties: {
     text: { type: "string" },
     candidate_ids: { type: "array", items: { type: "string" } },
@@ -41,6 +41,10 @@ const mentionField = {
         },
         { type: "null" },
       ],
+    },
+    confidence: {
+      type: "string",
+      enum: ["high", "medium", "low"],
     },
   },
 } as const;
@@ -161,11 +165,20 @@ export interface DirectoryRowV2 {
   role: string | null;
   tags: string[] | null;
   closeness: string | null;
+  prior_score: number;
   narrative_snippet: string | null;
 }
 
+/** Sort by prior_score desc, then full_name asc, so the most relevant
+ *  contacts appear first in the prompt. The model is told that order
+ *  is meaningful. */
 export function compactDirectoryV2(people: DirectoryRowV2[]): string {
-  return people
+  const sorted = [...people].sort((a, b) => {
+    const ps = (b.prior_score ?? 0) - (a.prior_score ?? 0);
+    if (ps !== 0) return ps;
+    return a.full_name.localeCompare(b.full_name);
+  });
+  return sorted
     .map((p) => {
       const aliases = (p.aliases ?? []).filter(Boolean);
       const namePart = aliases.length
@@ -173,10 +186,10 @@ export function compactDirectoryV2(people: DirectoryRowV2[]): string {
         : p.full_name;
       const co = [p.company, p.role].filter(Boolean).join(" – ") || "-";
       const tags = (p.tags ?? []).join(",") || "-";
-      const closeness = p.closeness ?? "-";
+      const prior = (p.prior_score ?? 0).toFixed(1);
       const snippet = (p.narrative_snippet ?? "").trim().replace(/\s+/g, " ");
       const tail = snippet ? ` :: ${snippet.slice(0, 140)}` : "";
-      return `${p.id} | ${namePart} | ${co} | ${tags} | ${closeness}${tail}`;
+      return `${p.id} | ${namePart} | ${co} | ${tags} | prior:${prior}${tail}`;
     })
     .join("\n");
 }
@@ -241,9 +254,20 @@ export function systemPromptV2(directory: string, contextObs: string): string {
     "",
     "## Resolución de menciones",
     "",
-    "- Para cada mention, mira el directorio. Si encaja con uno o varios contactos existentes, pon sus IDs en `candidate_ids` ordenados por probabilidad. Si no hay candidato razonable, `candidate_ids: []` y `proposed_new` con lo que sepas.",
-    "- **Conservador**: si \"Pablo\" matchea 5 Pablos, devuelve los 5 — NO elijas. Que decida el usuario.",
+    "- Para cada mention, mira el directorio. Si encaja con uno o varios contactos existentes, pon sus IDs en `candidate_ids` ordenados por probabilidad (el primero es tu apuesta).",
+    "- Si no hay candidato razonable, `candidate_ids: []` y `proposed_new` con lo que sepas.",
     "- Si la mención no tiene nombre identificable (\"el de marketing\", \"su CTO\"), `candidate_ids:[]` y `proposed_new:null`, y mete un warning. NO inventes nombres.",
+    "",
+    "## DESAMBIGUACIÓN POR PRIOR",
+    "",
+    "El directorio viene ordenado por `prior:N` (mayor primero). El prior combina cercanía personal + actividad reciente — un contacto con prior alto es *muy probablemente* a quien se refiere el usuario cuando lo menciona por primera vez. Reglas:",
+    "",
+    "1. **Prior ≥ 3 + único candidato fuerte** → asume sin warning. `confidence: 'high'`.",
+    "2. **Un candidato destaca claramente sobre los demás** (delta de prior ≥ 1.5 sobre el segundo, o el segundo tiene prior < 1) → asume con warning suave (\"hay otros X en el directorio, asumí Y por contexto\"). `confidence: 'medium'`. `candidate_ids` ordenados con tu apuesta primero.",
+    "3. **Empate o todos débiles** (todos < 1, o delta < 0.5) → ambigüedad real, warning fuerte, `confidence: 'low'`, `candidate_ids` con todos los plausibles.",
+    "4. **Nombre exacto + prior alto** (ej. el contacto se llama \"Judit Vázquez\" y prior ≥ 4) → asume directo aunque haya otras Judit, salvo contradicción contextual clara (empresa, evento, rol).",
+    "",
+    "El campo `confidence` es obligatorio en cada mention. Úsalo con honestidad — el usuario decide la UI según ese valor.",
     "",
     "## Convenciones del usuario",
     "",
@@ -256,7 +280,7 @@ export function systemPromptV2(directory: string, contextObs: string): string {
     "- Una observación = un hecho. \"Tiene 3 hijos y vive en Vigo\" → 2 observaciones.",
     "- Direcciones de promesa: `yo-a-el` si Mateo se compromete; `el-a-mi` si la otra parte se compromete con Mateo.",
     "",
-    "## Directorio de contactos (id | nombre [/alias] | empresa – rol | tags | closeness :: snippet del perfil)",
+    "## Directorio de contactos (id | nombre [/alias] | empresa – rol | tags | prior:N :: snippet del perfil) — ORDENADO POR PRIOR DESCENDENTE",
     "",
     directory,
     "",

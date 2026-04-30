@@ -153,6 +153,12 @@ export interface Person {
   archived?: boolean;
   /** True if this row was created by NL extraction (vs manually curated). */
   autoCreated?: boolean;
+  /** Composite signal used to bias mention disambiguation. See lib/person-prior.ts. */
+  priorScore?: number;
+  /** Timestamp of the most recent non-superseded observation this person participates in. */
+  lastObservationAt?: string;
+  /** Rolling 90-day participation count. */
+  observationCount90d?: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -54,12 +54,12 @@ function collectMentionsLocal(extraction: ExtractionV2): PersonMention[] {
 }
 
 function defaultResolution(m: PersonMention): MentionResolution {
-  if (m.candidate_ids.length === 1)
+  // confidence='high' → trust the LLM's first pick
+  // confidence='medium' → still pre-pick the top candidate, user can override
+  // confidence='low' → pre-pick top, but the UI surfaces the picker so user reviews
+  if (m.candidate_ids.length > 0)
     return { kind: "existing", personId: m.candidate_ids[0] };
-  if (m.candidate_ids.length === 0 && m.proposed_new)
-    return { kind: "new", person: m.proposed_new };
-  if (m.candidate_ids.length > 1)
-    return { kind: "existing", personId: m.candidate_ids[0] };
+  if (m.proposed_new) return { kind: "new", person: m.proposed_new };
   return { kind: "skip" };
 }
 

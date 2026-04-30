@@ -4,6 +4,7 @@ import {
   synthesizeFullRebuild,
   synthesizeIncremental,
 } from "@/lib/profile-synthesis";
+import { refreshAllPriors } from "@/lib/person-prior";
 
 /**
  * Profile synthesis job endpoint.
@@ -51,6 +52,10 @@ export async function POST(req: NextRequest) {
         batchSize: body.batchSize as number | undefined,
         throttleMs: body.throttleMs as number | undefined,
       });
+      return NextResponse.json({ ok: true, mode, ...result });
+    }
+    if (mode === "refresh-priors") {
+      const result = await refreshAllPriors();
       return NextResponse.json({ ok: true, mode, ...result });
     }
     if (mode === "rebuild") {

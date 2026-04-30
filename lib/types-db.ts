@@ -80,6 +80,9 @@ export interface PersonRow {
   next_step: string | null;
   archived: boolean;
   auto_created: boolean;
+  prior_score: number;
+  last_observation_at: string | null;
+  observation_count_90d: number;
   created_at: string;
   updated_at: string;
 }

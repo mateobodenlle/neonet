@@ -51,6 +51,10 @@ interface PersonUpdateExpectation {
   field: string;
   new_value_contains?: string;
 }
+interface ConfidenceExpectation {
+  text_contains: string;
+  confidence_in: Array<"high" | "medium" | "low">;
+}
 interface Case {
   note: string;
   expected: {
@@ -58,6 +62,7 @@ interface Case {
     must_mention_persons?: string[];
     must_have_facets?: FacetExpectation[];
     must_have_person_updates?: PersonUpdateExpectation[];
+    must_have_mentions_with_confidence?: ConfidenceExpectation[];
   };
 }
 
@@ -74,7 +79,7 @@ function readCases(): Case[] {
 async function loadDirectory(): Promise<DirectoryRowV2[]> {
   const { data, error } = await supa
     .from("people")
-    .select("id, full_name, aliases, company, role, tags, closeness")
+    .select("id, full_name, aliases, company, role, tags, closeness, prior_score")
     .eq("archived", false);
   if (error) throw error;
   return (data ?? []).map((p) => ({
@@ -85,6 +90,7 @@ async function loadDirectory(): Promise<DirectoryRowV2[]> {
     role: p.role,
     tags: p.tags,
     closeness: p.closeness,
+    prior_score: Number(p.prior_score ?? 0),
     narrative_snippet: null,
   }));
 }
@@ -158,6 +164,29 @@ function score(c: Case, ex: ExtractionV2): CaseResult {
       }
     });
     if (!matched) fails.push(`no observation with facets ${JSON.stringify(f)}`);
+  }
+  for (const exp of c.expected.must_have_mentions_with_confidence ?? []) {
+    type M = { text: string; confidence?: "high" | "medium" | "low" };
+    const all: M[] = [];
+    for (const o of ex.observations) {
+      all.push(o.primary_mention);
+      for (const p of o.participants) all.push(p.mention);
+    }
+    for (const u of ex.person_updates) all.push(u.primary_mention);
+    const matched = all.find((m) =>
+      m.text.toLowerCase().includes(exp.text_contains.toLowerCase())
+    );
+    if (!matched) {
+      fails.push(`no mention containing "${exp.text_contains}"`);
+      continue;
+    }
+    if (!matched.confidence) {
+      fails.push(`mention "${matched.text}" has no confidence field`);
+    } else if (!exp.confidence_in.includes(matched.confidence)) {
+      fails.push(
+        `mention "${matched.text}" confidence=${matched.confidence}, expected one of ${exp.confidence_in.join(",")}`
+      );
+    }
   }
   for (const u of c.expected.must_have_person_updates ?? []) {
     const matched = ex.person_updates.some((pu) => {

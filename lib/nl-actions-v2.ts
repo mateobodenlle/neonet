@@ -32,6 +32,7 @@ import {
   applySupersede,
   markPersonProfileDirty,
 } from "./server-actions";
+import { refreshPriorsForPersons } from "./person-prior";
 import type {
   ExtractionV2,
   ConfirmedPlanV2,
@@ -54,7 +55,7 @@ async function loadDirectory(): Promise<DirectoryRowV2[]> {
   // round-trips kept simple — both tables are small.
   const { data: people, error } = await supabaseAdmin
     .from("people")
-    .select("id, full_name, aliases, company, role, tags, closeness")
+    .select("id, full_name, aliases, company, role, tags, closeness, prior_score")
     .eq("archived", false);
   if (error) throw error;
   const ids = (people ?? []).map((p) => p.id);
@@ -74,6 +75,7 @@ async function loadDirectory(): Promise<DirectoryRowV2[]> {
     role: p.role,
     tags: p.tags,
     closeness: p.closeness,
+    prior_score: Number(p.prior_score ?? 0),
     narrative_snippet: narrativeById.get(p.id) ?? null,
   }));
 }
@@ -415,9 +417,10 @@ export async function applyPlanV2(
     }
   }
 
-  // 5. mark profiles dirty.
+  // 5. mark profiles dirty + refresh priors for every touched person.
   if (dirtyPersonIds.size > 0) {
     await markPersonProfileDirty([...dirtyPersonIds]);
+    await refreshPriorsForPersons([...dirtyPersonIds]);
   }
 
   return {

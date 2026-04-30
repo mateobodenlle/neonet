@@ -5,7 +5,7 @@ import { Check, Loader2, AlertTriangle, UserPlus, User, MinusCircle, Calendar, F
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
 import { useStore } from "@/lib/store";
 import { formatDate } from "@/lib/utils";
 import type { Person } from "@/lib/types";
@@ -357,56 +357,65 @@ function DirectoryPicker({
   onPick: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const active = people.filter((p) => !p.archived);
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? active.filter((p) =>
+        `${p.fullName} ${p.company ?? ""} ${p.role ?? ""} ${(p.aliases ?? []).join(" ")}`.toLowerCase().includes(q)
+      )
+    : active;
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setQuery(""); }}>
       <PopoverTrigger asChild>
-        <button
-          className="inline-flex items-center gap-1 rounded border border-dashed border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-secondary/60"
-        >
+        <button className="inline-flex items-center gap-1 rounded border border-dashed border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-secondary/60">
           <Search className="h-3 w-3" />
           Buscar contacto…
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-[320px] p-0"
-        // Inside a Dialog, Radix Popover and Dialog fight over the focus
-        // ring. Disable Popover's auto-focus so cmdk's input gets focus
-        // cleanly and arrow keys / Enter work as expected.
+        className="w-[300px] p-2"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <Command
-          // cmdk uses each item's `value` to filter; "Mateo" should match
-          // "Mateo Bodenlle Villarino" etc. Default fuzzy filter is fine.
-          loop
-        >
-          <CommandInput placeholder="Nombre, empresa, alias…" autoFocus />
-          <CommandList>
-            <CommandEmpty>Sin resultados.</CommandEmpty>
-            {people
-              .filter((p) => !p.archived)
-              .map((p) => (
-                <CommandItem
-                  key={p.id}
-                  value={`${p.fullName} ${p.company ?? ""} ${p.role ?? ""} ${(p.aliases ?? []).join(" ")} ${(p.tags ?? []).join(" ")}`}
-                  onSelect={() => {
-                    onPick(p.id);
-                    setOpen(false);
-                  }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px]">{p.fullName}</div>
-                    {(p.company || p.role) && (
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {[p.role, p.company].filter(Boolean).join(" · ")}
-                      </div>
-                    )}
+        <Input
+          autoFocus
+          placeholder="Nombre, empresa…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="mb-2 h-8 text-[13px]"
+        />
+        <div className="max-h-[220px] overflow-y-auto space-y-0.5">
+          {filtered.length === 0 && (
+            <div className="py-4 text-center text-[12px] text-muted-foreground">Sin resultados.</div>
+          )}
+          {filtered.map((p) => (
+            <button
+              key={p.id}
+              className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-secondary/70 ${
+                p.id === selectedId ? "bg-accent/10 text-accent" : ""
+              }`}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onPick(p.id);
+                setOpen(false);
+                setQuery("");
+              }}
+            >
+              <div className="min-w-0">
+                <div className="truncate text-[13px]">{p.fullName}</div>
+                {(p.company || p.role) && (
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {[p.role, p.company].filter(Boolean).join(" · ")}
                   </div>
-                  {p.id === selectedId && <Check className="h-3 w-3 text-accent" />}
-                </CommandItem>
-              ))}
-          </CommandList>
-        </Command>
+                )}
+              </div>
+              {p.id === selectedId && <Check className="h-3 w-3 shrink-0 text-accent" />}
+            </button>
+          ))}
+        </div>
       </PopoverContent>
     </Popover>
   );

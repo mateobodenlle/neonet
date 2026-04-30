@@ -70,6 +70,9 @@ export function personFromRow(r: PersonRow): Person {
     nextStep: r.next_step ?? undefined,
     archived: r.archived,
     autoCreated: r.auto_created ?? false,
+    priorScore: r.prior_score ?? 0,
+    lastObservationAt: r.last_observation_at ?? undefined,
+    observationCount90d: r.observation_count_90d ?? 0,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -97,6 +100,9 @@ export function personToRow(p: Person): PersonRow {
     next_step: p.nextStep ?? null,
     archived: p.archived ?? false,
     auto_created: p.autoCreated ?? false,
+    prior_score: p.priorScore ?? 0,
+    last_observation_at: p.lastObservationAt ?? null,
+    observation_count_90d: p.observationCount90d ?? 0,
     created_at: p.createdAt,
     updated_at: p.updatedAt,
   };
