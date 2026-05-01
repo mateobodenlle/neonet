@@ -11,6 +11,7 @@
  */
 
 import { supabaseAdmin } from "./supabase-admin";
+import { mergePersonFields } from "./merge-people";
 import {
   personFromRow,
   personToRow,
@@ -20,12 +21,11 @@ import {
   encounterToRow,
   interactionFromRow,
   interactionToRow,
-  painPointFromRow,
-  painPointToRow,
-  promiseFromRow,
-  promiseToRow,
   edgeFromRow,
   edgeToRow,
+  observationToRow,
+  observationParticipantToRow,
+  personProfileToRow,
 } from "./mappers";
 import type {
   Person,
@@ -36,6 +36,9 @@ import type {
   Promise as DomainPromise,
   Edge,
   Database,
+  Observation,
+  ObservationParticipant,
+  PersonProfile,
 } from "./types";
 
 const day = (s: string) => s.slice(0, 10);
@@ -47,30 +50,31 @@ function check(error: unknown): void {
 }
 
 // hydration ------------------------------------------------------------
+//
+// pain_points and promises were dropped in migration 0006. The store still
+// has fields for them — they hydrate as empty arrays so legacy UI keeps
+// rendering empty sections without runtime errors. A follow-up UI cleanup
+// will remove those sections entirely.
 export async function hydrate(): Promise<Database> {
-  const [people, events, encounters, interactions, painPoints, promises, edges] = await Promise.all([
+  const [people, events, encounters, interactions, edges] = await Promise.all([
     supabaseAdmin.from("people").select("*"),
     supabaseAdmin.from("events").select("*"),
     supabaseAdmin.from("encounters").select("*"),
     supabaseAdmin.from("interactions").select("*"),
-    supabaseAdmin.from("pain_points").select("*"),
-    supabaseAdmin.from("promises").select("*"),
     supabaseAdmin.from("edges").select("*"),
   ]);
   check(people.error);
   check(events.error);
   check(encounters.error);
   check(interactions.error);
-  check(painPoints.error);
-  check(promises.error);
   check(edges.error);
   return {
     people: (people.data ?? []).map(personFromRow),
     events: (events.data ?? []).map(eventFromRow),
     encounters: (encounters.data ?? []).map(encounterFromRow),
     interactions: (interactions.data ?? []).map(interactionFromRow),
-    painPoints: (painPoints.data ?? []).map(painPointFromRow),
-    promises: (promises.data ?? []).map(promiseFromRow),
+    painPoints: [],
+    promises: [],
     edges: (edges.data ?? []).map(edgeFromRow),
   };
 }
@@ -82,9 +86,43 @@ export async function persistPerson(p: Person): Promise<void> {
 }
 
 export async function deletePersonAction(id: string): Promise<void> {
-  // FK cascade handles encounters, interactions, pain_points, promises, edges.
+  // FK cascade handles encounters, interactions, observations, edges.
   const { error } = await supabaseAdmin.from("people").delete().eq("id", id);
   check(error);
+}
+
+export async function deletePersonsAction(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabaseAdmin.from("people").delete().in("id", ids);
+  check(error);
+}
+
+export async function mergePeopleAction(keepId: string, dropId: string): Promise<Person> {
+  if (keepId === dropId) throw new Error("cannot merge a person into itself");
+
+  const [keepRes, dropRes] = await Promise.all([
+    supabaseAdmin.from("people").select("*").eq("id", keepId).single(),
+    supabaseAdmin.from("people").select("*").eq("id", dropId).single(),
+  ]);
+  check(keepRes.error);
+  check(dropRes.error);
+  const keep = personFromRow(keepRes.data!);
+  const drop = personFromRow(dropRes.data!);
+  const merged = mergePersonFields(keep, drop);
+
+  const { error: upErr } = await supabaseAdmin
+    .from("people")
+    .update(personToRow(merged))
+    .eq("id", keepId);
+  check(upErr);
+
+  const { error: rpcErr } = await supabaseAdmin.rpc("merge_people", {
+    keep_id: keepId,
+    drop_id: dropId,
+  });
+  check(rpcErr);
+
+  return merged;
 }
 
 export async function restorePersonAction(
@@ -112,19 +150,9 @@ export async function restorePersonAction(
     const { error } = await supabaseAdmin.from("interactions").insert(rows);
     check(error);
   }
-  if (related.painPoints.length) {
-    const rows = related.painPoints.map(painPointToRow);
-    const { error } = await supabaseAdmin.from("pain_points").insert(rows);
-    check(error);
-  }
-  if (related.promises.length) {
-    const rows = related.promises.map((p) => ({
-      ...promiseToRow(p),
-      due_date: p.dueDate ? day(p.dueDate) : null,
-    }));
-    const { error } = await supabaseAdmin.from("promises").insert(rows);
-    check(error);
-  }
+  // pain_points and promises tables dropped in 0006 — restore is a no-op
+  // for those payloads. They live as observations now and follow the
+  // observation FK cascade on people.
   if (related.edges.length) {
     const rows = related.edges.map(edgeToRow);
     const { error } = await supabaseAdmin.from("edges").insert(rows);
@@ -219,51 +247,57 @@ export async function restoreInteractionAction(i: Interaction): Promise<void> {
 }
 
 // pain_points ----------------------------------------------------------
-export async function persistPainPoint(p: PainPoint): Promise<void> {
-  const row = painPointToRow(p);
-  const { error } = await supabaseAdmin.from("pain_points").upsert(row, { onConflict: "id" });
-  check(error);
+// Tables dropped in migration 0006. The functions below remain so legacy
+// callers (UI dialogs that haven't been excised yet) keep type-checking;
+// they no-op at runtime. New code emits observations with
+// facets.type='pain_point' / 'promesa' instead.
+export async function persistPainPoint(_p: PainPoint): Promise<void> {
+  void _p;
 }
-
-export async function deletePainPointAction(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from("pain_points").delete().eq("id", id);
-  check(error);
+export async function deletePainPointAction(_id: string): Promise<void> {
+  void _id;
 }
-
-export async function restorePainPointAction(p: PainPoint): Promise<void> {
-  await persistPainPoint(p);
+export async function restorePainPointAction(_p: PainPoint): Promise<void> {
+  void _p;
 }
 
 // promises -------------------------------------------------------------
-export async function persistPromise(p: DomainPromise): Promise<void> {
-  const row = { ...promiseToRow(p), due_date: p.dueDate ? day(p.dueDate) : null };
-  const { error } = await supabaseAdmin.from("promises").upsert(row, { onConflict: "id" });
-  check(error);
+export async function persistPromise(_p: DomainPromise): Promise<void> {
+  void _p;
 }
-
-export async function deletePromiseAction(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from("promises").delete().eq("id", id);
-  check(error);
+export async function deletePromiseAction(_id: string): Promise<void> {
+  void _id;
 }
-
-export async function restorePromiseAction(p: DomainPromise): Promise<void> {
-  await persistPromise(p);
+export async function restorePromiseAction(_p: DomainPromise): Promise<void> {
+  void _p;
 }
-
+/**
+ * Toggles the `done` facet on the observation that backs a legacy
+ * promise id. Promises were migrated as observations with
+ * id = `legacy-pr-<originalId>` and facets.type='promesa'. New promises
+ * (created via NL v2) share the same shape.
+ */
 export async function togglePromiseAction(id: string): Promise<void> {
-  // Read-modify-write so the server is the source of truth on the flip.
+  // Try matching by both legacy-mapped id and direct observation id.
+  const candidates = [id, `legacy-pr-${id}`];
   const { data, error } = await supabaseAdmin
-    .from("promises")
-    .select("done")
-    .eq("id", id)
-    .single();
+    .from("observations")
+    .select("id, facets")
+    .in("id", candidates)
+    .limit(1);
   check(error);
-  const done = !(data?.done ?? false);
-  const { error: updateError } = await supabaseAdmin
-    .from("promises")
-    .update({ done, completed_at: done ? new Date().toISOString() : null })
-    .eq("id", id);
-  check(updateError);
+  const row = data?.[0];
+  if (!row) return;
+  const facets = (row.facets ?? {}) as Record<string, unknown>;
+  const done = !facets.done;
+  const next: Record<string, unknown> = { ...facets, done };
+  if (done) next.completed_at = new Date().toISOString();
+  else delete next.completed_at;
+  const { error: ue } = await supabaseAdmin
+    .from("observations")
+    .update({ facets: next })
+    .eq("id", row.id);
+  check(ue);
 }
 
 // edges ----------------------------------------------------------------
@@ -280,4 +314,68 @@ export async function deleteEdgeAction(id: string): Promise<void> {
 
 export async function restoreEdgeAction(e: Edge): Promise<void> {
   await persistEdge(e);
+}
+
+// observations ---------------------------------------------------------
+export async function persistObservation(o: Observation): Promise<void> {
+  const row = { ...observationToRow(o), observed_at: day(o.observedAt) };
+  const { error } = await supabaseAdmin
+    .from("observations")
+    .upsert(row, { onConflict: "id" });
+  check(error);
+}
+
+export async function persistObservationParticipants(
+  participants: ObservationParticipant[]
+): Promise<void> {
+  if (participants.length === 0) return;
+  const rows = participants.map(observationParticipantToRow);
+  const { error } = await supabaseAdmin
+    .from("observation_participants")
+    .upsert(rows, { onConflict: "observation_id,person_id,role" });
+  check(error);
+}
+
+export async function deleteObservationAction(id: string): Promise<void> {
+  // FK cascade removes observation_participants.
+  const { error } = await supabaseAdmin.from("observations").delete().eq("id", id);
+  check(error);
+}
+
+export async function applySupersede(
+  oldId: string,
+  newId: string
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("observations")
+    .update({ superseded_by: newId })
+    .eq("id", oldId);
+  check(error);
+}
+
+export async function persistProfile(p: PersonProfile): Promise<void> {
+  const row = personProfileToRow(p);
+  const { error } = await supabaseAdmin
+    .from("person_profiles")
+    .upsert(row, { onConflict: "person_id" });
+  check(error);
+}
+
+export async function markPersonProfileDirty(personIds: string[]): Promise<void> {
+  if (personIds.length === 0) return;
+  const now = new Date().toISOString();
+  // Use upsert semantics: insert empty profile if missing, set dirty_since
+  // unconditionally so a dormant profile becomes dirty too.
+  const rows = personIds.map((id) => ({
+    person_id: id,
+    dirty_since: now,
+  }));
+  const { error } = await supabaseAdmin
+    .from("person_profiles")
+    .upsert(rows, { onConflict: "person_id" });
+  check(error);
+  // upsert won't overwrite existing dirty_since with the new value if onConflict
+  // does merge — Supabase merges all provided columns, so dirty_since is
+  // updated. Confirmed via docs (postgrest upsert = ON CONFLICT DO UPDATE SET
+  // every provided column).
 }

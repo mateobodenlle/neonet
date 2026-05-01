@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { CommandPalette } from "@/components/command-palette";
 import { HydrationGate } from "@/components/hydration-gate";
+import { NLInputDialog } from "@/components/nl-input-dialog";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </main>
         </div>
         <CommandPalette />
+        <NLInputDialog />
         <Toaster />
       </body>
     </html>

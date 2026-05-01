@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { useDeleteContact, useArchivePerson } from "@/lib/actions";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -11,8 +13,9 @@ import { PersonAvatar } from "@/components/person-avatar";
 import { TemperatureBadge } from "@/components/temperature-badge";
 import { CategoryBadge } from "@/components/category-badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, MoreHorizontal, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { Search, MoreHorizontal, Pencil, Archive, ArchiveRestore, Trash2, Combine } from "lucide-react";
 import { AddContactDialog, ContactDialog } from "@/components/add-contact-dialog";
+import { MergeContactsDialog } from "@/components/merge-contacts-dialog";
 import type { Category, Sector, Temperature, Person } from "@/lib/types";
 import { relativeDate } from "@/lib/utils";
 
@@ -21,6 +24,7 @@ type SortBy = "recency" | "alpha" | "affinity" | "encounters";
 export default function ContactsPage() {
   const people = useStore((s) => s.people);
   const encounters = useStore((s) => s.encounters);
+  const bulkDeletePeople = useStore((s) => s.bulkDeletePeople);
   const deleteContact = useDeleteContact();
   const archivePerson = useArchivePerson();
 
@@ -31,6 +35,9 @@ export default function ContactsPage() {
   const [sort, setSort] = useState<SortBy>("recency");
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [lastClickedId, setLastClickedId] = useState<string | null>(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   const stats = useMemo(() => {
     const last = new Map<string, string>();
@@ -76,6 +83,73 @@ export default function ContactsPage() {
   }, [people, q, cat, temp, sector, sort, showArchived, stats]);
 
   const archivedCount = people.filter((p) => p.archived).length;
+
+  const filteredIds = useMemo(() => filtered.map((p) => p.id), [filtered]);
+  const allSelectedInView =
+    filteredIds.length > 0 && filteredIds.every((id) => selected.has(id));
+  const someSelectedInView =
+    !allSelectedInView && filteredIds.some((id) => selected.has(id));
+
+  function toggleOne(id: string, e: React.MouseEvent | React.KeyboardEvent) {
+    const isShift = "shiftKey" in e && e.shiftKey;
+    const next = new Set(selected);
+    if (isShift && lastClickedId && lastClickedId !== id) {
+      const a = filteredIds.indexOf(lastClickedId);
+      const b = filteredIds.indexOf(id);
+      if (a >= 0 && b >= 0) {
+        const [from, to] = a < b ? [a, b] : [b, a];
+        const shouldSelect = !next.has(id);
+        for (let i = from; i <= to; i++) {
+          if (shouldSelect) next.add(filteredIds[i]);
+          else next.delete(filteredIds[i]);
+        }
+        setSelected(next);
+        setLastClickedId(id);
+        return;
+      }
+    }
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+    setLastClickedId(id);
+  }
+
+  function toggleAllInView() {
+    const next = new Set(selected);
+    if (allSelectedInView) {
+      for (const id of filteredIds) next.delete(id);
+    } else {
+      for (const id of filteredIds) next.add(id);
+    }
+    setSelected(next);
+  }
+
+  function clearSelection() {
+    setSelected(new Set());
+    setLastClickedId(null);
+  }
+
+  const mergeCandidates = useMemo<[Person, Person] | null>(() => {
+    if (selected.size !== 2) return null;
+    const ids = [...selected];
+    const a = people.find((p) => p.id === ids[0]);
+    const b = people.find((p) => p.id === ids[1]);
+    return a && b ? [a, b] : null;
+  }, [selected, people]);
+
+  function bulkDelete() {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `¿Eliminar ${ids.length} contacto${ids.length === 1 ? "" : "s"}? Esta acción no se puede deshacer.`
+      )
+    )
+      return;
+    const n = bulkDeletePeople(ids);
+    clearSelection();
+    toast.success(`${n} contacto${n === 1 ? "" : "s"} eliminado${n === 1 ? "" : "s"}`);
+  }
 
   return (
     <div className="space-y-6">
@@ -140,7 +214,16 @@ export default function ContactsPage() {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_110px_110px_90px_40px] items-center gap-4 border-b border-border bg-secondary/30 px-4 py-2 text-[12px] text-muted-foreground">
+        <div className="grid grid-cols-[28px_minmax(0,2fr)_minmax(0,1fr)_110px_110px_90px_40px] items-center gap-4 border-b border-border bg-secondary/30 px-4 py-2 text-[12px] text-muted-foreground">
+          <Checkbox
+            checked={allSelectedInView}
+            onCheckedChange={() => toggleAllInView()}
+            aria-label={
+              someSelectedInView
+                ? "Algunos seleccionados — clic para seleccionar todos"
+                : "Seleccionar todos los visibles"
+            }
+          />
           <span>Nombre</span>
           <span>Rol / empresa</span>
           <span>Categoría</span>
@@ -151,8 +234,37 @@ export default function ContactsPage() {
         <ul className="divide-y divide-border">
           {filtered.map((p) => {
             const last = stats.last.get(p.id);
+            const isSelected = selected.has(p.id);
             return (
-              <li key={p.id} className="group grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_110px_110px_90px_40px] items-center gap-4 px-4 py-2.5 hover:bg-secondary/40">
+              <li
+                key={p.id}
+                className={`group grid grid-cols-[28px_minmax(0,2fr)_minmax(0,1fr)_110px_110px_90px_40px] items-center gap-4 px-4 py-2.5 hover:bg-secondary/40 ${
+                  isSelected ? "bg-accent/5" : ""
+                }`}
+              >
+                <span
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleOne(p.id, e);
+                  }}
+                  className="flex h-full items-center cursor-pointer"
+                  role="checkbox"
+                  aria-checked={isSelected}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === " " || e.key === "Enter") {
+                      e.preventDefault();
+                      toggleOne(p.id, e);
+                    }
+                  }}
+                >
+                  <Checkbox
+                    checked={isSelected}
+                    aria-label={`Seleccionar ${p.fullName}`}
+                    className="pointer-events-none"
+                  />
+                </span>
                 <Link href={`/contacts/${p.id}`} className="flex min-w-0 items-center gap-3">
                   <PersonAvatar person={p} />
                   <div className="min-w-0">
@@ -198,6 +310,34 @@ export default function ContactsPage() {
       </div>
 
       <ContactDialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)} initial={editing ?? undefined} />
+
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-card px-4 py-2 shadow-lg flex items-center gap-3">
+          <span className="text-[13px]">
+            <strong>{selected.size}</strong> seleccionado{selected.size === 1 ? "" : "s"}
+          </span>
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            Limpiar
+          </Button>
+          {mergeCandidates && (
+            <Button size="sm" variant="outline" onClick={() => setMergeOpen(true)}>
+              <Combine className="h-3.5 w-3.5" />
+              Combinar
+            </Button>
+          )}
+          <Button size="sm" variant="destructive" onClick={bulkDelete}>
+            <Trash2 className="h-3.5 w-3.5" />
+            Eliminar
+          </Button>
+        </div>
+      )}
+
+      <MergeContactsDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        people={mergeCandidates}
+        onMerged={clearSelection}
+      />
     </div>
   );
 }
