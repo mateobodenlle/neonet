@@ -13,8 +13,9 @@ import { PersonAvatar } from "@/components/person-avatar";
 import { TemperatureBadge } from "@/components/temperature-badge";
 import { CategoryBadge } from "@/components/category-badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, MoreHorizontal, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { Search, MoreHorizontal, Pencil, Archive, ArchiveRestore, Trash2, Combine } from "lucide-react";
 import { AddContactDialog, ContactDialog } from "@/components/add-contact-dialog";
+import { MergeContactsDialog } from "@/components/merge-contacts-dialog";
 import type { Category, Sector, Temperature, Person } from "@/lib/types";
 import { relativeDate } from "@/lib/utils";
 
@@ -36,6 +37,7 @@ export default function ContactsPage() {
   const [editing, setEditing] = useState<Person | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lastClickedId, setLastClickedId] = useState<string | null>(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   const stats = useMemo(() => {
     const last = new Map<string, string>();
@@ -126,6 +128,14 @@ export default function ContactsPage() {
     setSelected(new Set());
     setLastClickedId(null);
   }
+
+  const mergeCandidates = useMemo<[Person, Person] | null>(() => {
+    if (selected.size !== 2) return null;
+    const ids = [...selected];
+    const a = people.find((p) => p.id === ids[0]);
+    const b = people.find((p) => p.id === ids[1]);
+    return a && b ? [a, b] : null;
+  }, [selected, people]);
 
   function bulkDelete() {
     const ids = [...selected];
@@ -309,12 +319,25 @@ export default function ContactsPage() {
           <Button size="sm" variant="ghost" onClick={clearSelection}>
             Limpiar
           </Button>
+          {mergeCandidates && (
+            <Button size="sm" variant="outline" onClick={() => setMergeOpen(true)}>
+              <Combine className="h-3.5 w-3.5" />
+              Combinar
+            </Button>
+          )}
           <Button size="sm" variant="destructive" onClick={bulkDelete}>
             <Trash2 className="h-3.5 w-3.5" />
             Eliminar
           </Button>
         </div>
       )}
+
+      <MergeContactsDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        people={mergeCandidates}
+        onMerged={clearSelection}
+      />
     </div>
   );
 }

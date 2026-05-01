@@ -12,11 +12,13 @@ import type {
   Edge,
   Event as DomainEvent,
 } from "./types";
+import { mergePersonFields } from "./merge-people";
 import {
   hydrate as hydrateAction,
   persistPerson,
   deletePersonAction,
   deletePersonsAction,
+  mergePeopleAction,
   restorePersonAction,
   archivePersonAction,
   persistEncounter,
@@ -61,6 +63,7 @@ interface Actions {
   updatePerson: (id: string, patch: Partial<Person>) => void;
   deletePerson: (id: string) => RelatedSnapshot | null;
   bulkDeletePeople: (ids: string[]) => number;
+  mergePeople: (keepId: string, dropId: string) => Person | null;
   restorePerson: (person: Person, related: RelatedSnapshot) => void;
   archivePerson: (id: string, archived: boolean) => void;
 
@@ -204,6 +207,55 @@ export const useStore = create<Database & SyncState & Actions>()((set, get) => (
       deletePersonsAction(removed.map((p) => p.id))
     );
     return removed.length;
+  },
+  mergePeople: (keepId, dropId) => {
+    if (keepId === dropId) return null;
+    const s = get();
+    const keep = s.people.find((p) => p.id === keepId);
+    const drop = s.people.find((p) => p.id === dropId);
+    if (!keep || !drop) return null;
+    const merged = mergePersonFields(keep, drop);
+
+    const remap = (id: string | undefined) => (id === dropId ? keepId : id);
+
+    const encounters = s.encounters.map((e) => ({
+      ...e,
+      personId: remap(e.personId)!,
+      introducedById:
+        e.introducedById === dropId ? keepId : e.introducedById,
+    })).map((e) => (e.introducedById === e.personId ? { ...e, introducedById: undefined } : e));
+
+    const interactions = s.interactions.map((i) => ({
+      ...i,
+      personId: remap(i.personId)!,
+    }));
+
+    // Edge dedup mirrors the SQL: drop self-loops, drop dupes by (from,to,kind).
+    const seenEdgeKeys = new Set<string>();
+    const edges = s.edges
+      .map((e) => ({
+        ...e,
+        fromPersonId: remap(e.fromPersonId)!,
+        toPersonId: remap(e.toPersonId)!,
+      }))
+      .filter((e) => e.fromPersonId !== e.toPersonId)
+      .filter((e) => {
+        const k = `${e.fromPersonId}|${e.toPersonId}|${e.kind}`;
+        if (seenEdgeKeys.has(k)) return false;
+        seenEdgeKeys.add(k);
+        return true;
+      });
+
+    set({
+      people: s.people
+        .filter((p) => p.id !== dropId)
+        .map((p) => (p.id === keepId ? merged : p)),
+      encounters,
+      interactions,
+      edges,
+    });
+    syncFireAndForget("combinar contactos", () => mergePeopleAction(keepId, dropId));
+    return merged;
   },
   restorePerson: (person, related) => {
     set((s) => ({

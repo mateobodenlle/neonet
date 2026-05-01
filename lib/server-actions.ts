@@ -11,6 +11,7 @@
  */
 
 import { supabaseAdmin } from "./supabase-admin";
+import { mergePersonFields } from "./merge-people";
 import {
   personFromRow,
   personToRow,
@@ -94,6 +95,34 @@ export async function deletePersonsAction(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const { error } = await supabaseAdmin.from("people").delete().in("id", ids);
   check(error);
+}
+
+export async function mergePeopleAction(keepId: string, dropId: string): Promise<Person> {
+  if (keepId === dropId) throw new Error("cannot merge a person into itself");
+
+  const [keepRes, dropRes] = await Promise.all([
+    supabaseAdmin.from("people").select("*").eq("id", keepId).single(),
+    supabaseAdmin.from("people").select("*").eq("id", dropId).single(),
+  ]);
+  check(keepRes.error);
+  check(dropRes.error);
+  const keep = personFromRow(keepRes.data!);
+  const drop = personFromRow(dropRes.data!);
+  const merged = mergePersonFields(keep, drop);
+
+  const { error: upErr } = await supabaseAdmin
+    .from("people")
+    .update(personToRow(merged))
+    .eq("id", keepId);
+  check(upErr);
+
+  const { error: rpcErr } = await supabaseAdmin.rpc("merge_people", {
+    keep_id: keepId,
+    drop_id: dropId,
+  });
+  check(rpcErr);
+
+  return merged;
 }
 
 export async function restorePersonAction(
