@@ -14,7 +14,10 @@
     "db:wipe": "tsx scripts/wipe.ts",
     "import:vcard": "tsx scripts/import-vcard.ts",
     "import:linkedin": "tsx scripts/import-linkedin.ts",
-    "import:linkedin-invitations": "tsx scripts/import-linkedin-invitations.ts"
+    "import:linkedin-invitations": "tsx scripts/import-linkedin-invitations.ts",
+    "import:linkedin-candidates": "tsx scripts/import-linkedin-candidates.ts",
+    "import:linkedin-self": "tsx scripts/import-linkedin-self.ts",
+    "import:linkedin-content": "tsx scripts/import-linkedin-content.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.1",

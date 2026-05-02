@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, notFound } from "next/navigation";
 import Link from "next/link";
 import { useDerived, useStore } from "@/lib/store";
@@ -15,6 +15,7 @@ import { TemperaturePicker } from "@/components/temperature-picker";
 import { ClosenessPicker } from "@/components/closeness-picker";
 import { NLInputPersonCard } from "@/components/nl-input-person-card";
 import { PersonObservationsCard } from "@/components/person-observations-card";
+import { LinkedinInsightCard } from "@/components/linkedin-insight-card";
 import { CategoryPicker } from "@/components/category-picker";
 import { TagsEditor } from "@/components/tags-editor";
 import { ContactDialog } from "@/components/add-contact-dialog";
@@ -25,7 +26,8 @@ import { PromiseDialog, AddPromiseDialog } from "@/components/add-promise-dialog
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDate, relativeDate } from "@/lib/utils";
 import { ArrowLeft, Building2, MapPin, Mail, Phone, Globe, Linkedin, Instagram, Twitter, MoreHorizontal, Pencil, Trash2, Archive, ArchiveRestore, CalendarDays, MessageSquare, StickyNote, TriangleAlert, ChevronDown, Send } from "lucide-react";
-import type { Interaction, Encounter, PainPoint, Promise as PromiseT, Temperature, Category, InteractionKind } from "@/lib/types";
+import { fetchPersonObservations, fetchPersonProfile } from "@/lib/observations-actions";
+import type { Interaction, Encounter, PainPoint, Promise as PromiseT, Temperature, Category, InteractionKind, Observation, PersonProfile } from "@/lib/types";
 
 export default function ContactDetailPage() {
   const params = useParams<{ id: string }>();
@@ -58,8 +60,44 @@ export default function ContactDetailPage() {
   const promises = d.getPromisesByPerson(person.id);
   const edges = d.getEdgesForPerson(person.id);
 
-  const firstEncounter = encounters[encounters.length - 1];
-  const lastEncounter = encounters[0];
+  // Observations live outside the Zustand store; fetch them per page and
+  // re-fetch when the person's lastObservationAt advances (which happens
+  // after applyPlanV2 → hydrate() refreshes the people store).
+  const [observations, setObservations] = useState<Observation[] | null>(null);
+  const [profile, setProfile] = useState<PersonProfile | null>(null);
+  const [observationsLoading, setObservationsLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    setObservationsLoading(true);
+    Promise.all([
+      fetchPersonObservations(person.id),
+      fetchPersonProfile(person.id),
+    ])
+      .then(([obs, prof]) => {
+        if (cancelled) return;
+        setObservations(obs);
+        setProfile(prof);
+      })
+      .catch((e) => console.error(e))
+      .finally(() => !cancelled && setObservationsLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [person.id, person.lastObservationAt, person.updatedAt]);
+
+  const stats = useMemo(() => {
+    const obsDates = (observations ?? []).map((o) => o.observedAt).filter(Boolean);
+    const encDates = encounters.map((e) => e.date);
+    const allDates = [...obsDates, ...encDates];
+    const firstActivity =
+      allDates.length > 0
+        ? allDates.reduce((a, b) => (a < b ? a : b))
+        : person.createdAt.slice(0, 10);
+    const lastActivity =
+      allDates.length > 0 ? allDates.reduce((a, b) => (a > b ? a : b)) : null;
+    const totalInteractions = encounters.length + (observations?.length ?? 0);
+    return { firstActivity, lastActivity, totalInteractions };
+  }, [encounters, observations, person.createdAt]);
   const now = new Date().toISOString();
   const openPromises = promises.filter((p) => !p.done);
   const donePromises = promises.filter((p) => p.done).sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
@@ -183,9 +221,19 @@ export default function ContactDetailPage() {
 
       {/* Key facts */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-border bg-card px-5 py-4 sm:grid-cols-4">
-        <Fact label="Primer encuentro" value={firstEncounter ? formatDate(firstEncounter.date) : "—"} />
-        <Fact label="Último contacto" value={lastEncounter ? relativeDate(lastEncounter.date) : "—"} />
-        <Fact label="Encuentros" value={encounters.length.toString()} />
+        <Fact label="Primer contacto" value={formatDate(stats.firstActivity)} />
+        <Fact
+          label="Último contacto"
+          value={stats.lastActivity ? relativeDate(stats.lastActivity) : "—"}
+        />
+        <Fact
+          label="Interacciones"
+          value={
+            encounters.length > 0
+              ? `${stats.totalInteractions} (${encounters.length} en persona)`
+              : stats.totalInteractions.toString()
+          }
+        />
         <Fact label="Afinidad / confianza" value={`${person.affinity ?? "—"} / ${person.trust ?? "—"}`} />
       </div>
 
@@ -217,7 +265,14 @@ export default function ContactDetailPage() {
 
       <NLInputPersonCard personId={person.id} personName={person.fullName} />
 
-      <PersonObservationsCard personId={person.id} />
+      <LinkedinInsightCard personId={person.id} hasLinkedin={!!person.handles?.linkedin} />
+
+      <PersonObservationsCard
+        personId={person.id}
+        observations={observations}
+        profile={profile}
+        externalLoading={observationsLoading}
+      />
 
       {/* Main grid */}
       <div className="grid gap-6 lg:grid-cols-3">
