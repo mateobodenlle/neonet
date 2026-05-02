@@ -4,50 +4,45 @@ import { useState, useMemo } from "react";
 import { useParams, notFound } from "next/navigation";
 import Link from "next/link";
 import { useDerived, useStore } from "@/lib/store";
-import { useCompletePromise, useDeleteContact, useDeleteEncounter, useDeleteInteraction, useDeletePainPoint, useDeletePromise, useArchivePerson } from "@/lib/actions";
+import { useDeleteContact, useDeleteEncounter, useDeleteInteraction, useDeletePainPoint, useArchivePerson } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { PersonAvatar } from "@/components/person-avatar";
 import { TemperaturePicker } from "@/components/temperature-picker";
 import { ClosenessPicker } from "@/components/closeness-picker";
 import { NLInputPersonCard } from "@/components/nl-input-person-card";
 import { PersonObservationsCard } from "@/components/person-observations-card";
+import { PersonPendientesCard } from "@/components/person-pendientes-card";
 import { CategoryPicker } from "@/components/category-picker";
 import { TagsEditor } from "@/components/tags-editor";
 import { ContactDialog } from "@/components/add-contact-dialog";
 import { EncounterDialog, AddEncounterDialog } from "@/components/add-encounter-dialog";
 import { InteractionDialog, AddInteractionDialog } from "@/components/add-interaction-dialog";
 import { PainPointDialog, AddPainPointDialog } from "@/components/add-painpoint-dialog";
-import { PromiseDialog, AddPromiseDialog } from "@/components/add-promise-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDate, relativeDate } from "@/lib/utils";
-import { ArrowLeft, Building2, MapPin, Mail, Phone, Globe, Linkedin, Instagram, Twitter, MoreHorizontal, Pencil, Trash2, Archive, ArchiveRestore, CalendarDays, MessageSquare, StickyNote, TriangleAlert, ChevronDown, Send } from "lucide-react";
-import type { Interaction, Encounter, PainPoint, Promise as PromiseT, Temperature, Category, InteractionKind } from "@/lib/types";
+import { ArrowLeft, Building2, MapPin, Mail, Phone, Globe, Linkedin, Instagram, Twitter, MoreHorizontal, Pencil, Trash2, Archive, ArchiveRestore, StickyNote, TriangleAlert, Send } from "lucide-react";
+import type { Interaction, Encounter, PainPoint, Temperature, Category, InteractionKind } from "@/lib/types";
 
 export default function ContactDetailPage() {
   const params = useParams<{ id: string }>();
   const d = useDerived();
   const updatePerson = useStore((s) => s.updatePerson);
   const addInteraction = useStore((s) => s.addInteraction);
-  const completePromise = useCompletePromise();
   const deleteContact = useDeleteContact();
   const archivePerson = useArchivePerson();
   const deleteEncounter = useDeleteEncounter();
   const deleteInteraction = useDeleteInteraction();
   const deletePainPoint = useDeletePainPoint();
-  const deletePromise = useDeletePromise();
 
   const [editingContact, setEditingContact] = useState(false);
   const [editingEncounter, setEditingEncounter] = useState<Encounter | null>(null);
   const [editingInteraction, setEditingInteraction] = useState<Interaction | null>(null);
   const [editingPainPoint, setEditingPainPoint] = useState<PainPoint | null>(null);
-  const [editingPromise, setEditingPromise] = useState<PromiseT | null>(null);
   const [quickNote, setQuickNote] = useState("");
   const [timelineFilter, setTimelineFilter] = useState<"all" | InteractionKind>("all");
-  const [showCompleted, setShowCompleted] = useState(false);
 
   const person = d.getPerson(params.id);
   if (!person) notFound();
@@ -55,14 +50,10 @@ export default function ContactDetailPage() {
   const encounters = d.getEncountersByPerson(person.id);
   const interactions = d.getInteractionsByPerson(person.id);
   const painPoints = d.getPainPointsByPerson(person.id);
-  const promises = d.getPromisesByPerson(person.id);
   const edges = d.getEdgesForPerson(person.id);
 
   const firstEncounter = encounters[encounters.length - 1];
   const lastEncounter = encounters[0];
-  const now = new Date().toISOString();
-  const openPromises = promises.filter((p) => !p.done);
-  const donePromises = promises.filter((p) => p.done).sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
 
   const filteredTimeline = useMemo(() => {
     if (timelineFilter === "all") return interactions;
@@ -321,65 +312,7 @@ export default function ContactDetailPage() {
         </div>
 
         <div className="space-y-6">
-          {/* Promises (open) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pendientes</CardTitle>
-              <AddPromiseDialog personId={person.id} />
-            </CardHeader>
-            <CardContent className="p-0">
-              {openPromises.length === 0 && <div className="px-5 pb-5 text-[13px] text-muted-foreground">Sin pendientes.</div>}
-              <ul className="divide-y divide-border">
-                {openPromises.map((pr) => {
-                  const isOverdue = pr.dueDate && pr.dueDate < now;
-                  return (
-                    <li key={pr.id} className="group flex items-start gap-3 px-5 py-2.5">
-                      <Checkbox checked={pr.done} onCheckedChange={() => completePromise(pr.id, pr.done, person.fullName)} className="mt-0.5" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px]">{pr.description}</div>
-                        <div className="mt-0.5 flex items-center gap-2 text-[12px] text-muted-foreground">
-                          <span>{pr.direction === "yo-a-el" ? "yo →" : "← ellos"}</span>
-                          {pr.dueDate && (
-                            <span className={isOverdue ? "text-destructive" : ""}>
-                              · {formatDate(pr.dueDate, { day: "2-digit", month: "short" })}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <RowMenu
-                        onEdit={() => setEditingPromise(pr)}
-                        onDelete={() => deletePromise(pr.id)}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-              {donePromises.length > 0 && (
-                <div className="border-t border-border">
-                  <button
-                    onClick={() => setShowCompleted((v) => !v)}
-                    className="flex w-full items-center justify-between px-5 py-2 text-[12px] text-muted-foreground hover:text-foreground"
-                  >
-                    <span>{donePromises.length} completados</span>
-                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showCompleted ? "rotate-180" : ""}`} />
-                  </button>
-                  {showCompleted && (
-                    <ul className="divide-y divide-border">
-                      {donePromises.map((pr) => (
-                        <li key={pr.id} className="flex items-start gap-3 px-5 py-2">
-                          <Checkbox checked={pr.done} onCheckedChange={() => completePromise(pr.id, pr.done, person.fullName)} className="mt-0.5" />
-                          <div className="min-w-0 flex-1">
-                            <div className="text-[13px] text-muted-foreground line-through">{pr.description}</div>
-                            {pr.completedAt && <div className="mt-0.5 text-[11px] text-muted-foreground/70">cerrado {relativeDate(pr.completedAt)}</div>}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <PersonPendientesCard personId={person.id} personName={person.fullName} />
 
           {edges.length > 0 && (
             <Card>
@@ -425,7 +358,6 @@ export default function ContactDetailPage() {
       <EncounterDialog open={!!editingEncounter} onOpenChange={(v) => !v && setEditingEncounter(null)} personId={person.id} initial={editingEncounter ?? undefined} />
       <InteractionDialog open={!!editingInteraction} onOpenChange={(v) => !v && setEditingInteraction(null)} personId={person.id} initial={editingInteraction ?? undefined} />
       <PainPointDialog open={!!editingPainPoint} onOpenChange={(v) => !v && setEditingPainPoint(null)} personId={person.id} initial={editingPainPoint ?? undefined} />
-      <PromiseDialog open={!!editingPromise} onOpenChange={(v) => !v && setEditingPromise(null)} personId={person.id} initial={editingPromise ?? undefined} />
     </div>
   );
 }
