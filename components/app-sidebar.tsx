@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Home, Users, CalendarDays, Share2, Search } from "lucide-react";
+import { Home, Users, CalendarDays, Share2, Search, User } from "lucide-react";
 
 const nav = [
   { href: "/", label: "Inicio", icon: Home },
   { href: "/contacts", label: "Contactos", icon: Users },
   { href: "/events", label: "Eventos", icon: CalendarDays },
   { href: "/graph", label: "Grafo", icon: Share2 },
+  { href: "/me", label: "Sobre mí", icon: User },
 ];
 
 export function AppSidebar() {

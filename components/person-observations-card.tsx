@@ -15,14 +15,28 @@ interface Props {
   personId: string;
   /** Bumped externally (e.g. after applyPlanV2 succeeds) to force a refetch. */
   refreshKey?: number;
+  /** When provided, the card skips its own fetch and uses these. The parent
+   *  is then responsible for keeping them fresh (typically by depending on
+   *  the person's lastObservationAt timestamp). */
+  observations?: Observation[] | null;
+  profile?: PersonProfile | null;
+  externalLoading?: boolean;
 }
 
-export function PersonObservationsCard({ personId, refreshKey }: Props) {
-  const [observations, setObservations] = useState<Observation[] | null>(null);
-  const [profile, setProfile] = useState<PersonProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+export function PersonObservationsCard({
+  personId,
+  refreshKey,
+  observations: observationsProp,
+  profile: profileProp,
+  externalLoading,
+}: Props) {
+  const ownFetch = observationsProp === undefined;
+  const [observationsState, setObservations] = useState<Observation[] | null>(null);
+  const [profileState, setProfile] = useState<PersonProfile | null>(null);
+  const [loadingState, setLoading] = useState(ownFetch);
 
   useEffect(() => {
+    if (!ownFetch) return;
     let cancelled = false;
     setLoading(true);
     Promise.all([fetchPersonObservations(personId), fetchPersonProfile(personId)])
@@ -40,7 +54,11 @@ export function PersonObservationsCard({ personId, refreshKey }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [personId, refreshKey]);
+  }, [personId, refreshKey, ownFetch]);
+
+  const observations = ownFetch ? observationsState : observationsProp ?? null;
+  const profile = ownFetch ? profileState : profileProp ?? null;
+  const loading = ownFetch ? loadingState : !!externalLoading;
 
   return (
     <Card>

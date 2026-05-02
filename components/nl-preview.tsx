@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { useStore } from "@/lib/store";
-import { formatDate } from "@/lib/utils";
+import { formatDate, foldText } from "@/lib/utils";
 import type { Person } from "@/lib/types";
 import type { Extraction, MentionResolution } from "@/lib/nl-types";
 
@@ -360,10 +360,12 @@ function DirectoryPicker({
   const [query, setQuery] = useState("");
 
   const active = people.filter((p) => !p.archived);
-  const q = query.trim().toLowerCase();
+  const q = foldText(query.trim());
   const filtered = q
     ? active.filter((p) =>
-        `${p.fullName} ${p.company ?? ""} ${p.role ?? ""} ${(p.aliases ?? []).join(" ")}`.toLowerCase().includes(q)
+        foldText(
+          `${p.fullName} ${p.company ?? ""} ${p.role ?? ""} ${(p.aliases ?? []).join(" ")}`
+        ).includes(q)
       )
     : active;
 

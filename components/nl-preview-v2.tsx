@@ -509,26 +509,36 @@ function DirectoryPicker({
             <CommandEmpty>Sin resultados.</CommandEmpty>
             {people
               .filter((p) => !p.archived)
-              .map((p) => (
-                <CommandItem
-                  key={p.id}
-                  value={`${p.fullName} ${p.company ?? ""} ${p.role ?? ""} ${(p.aliases ?? []).join(" ")} ${(p.tags ?? []).join(" ")}`}
-                  onSelect={() => {
-                    onPick(p.id);
-                    setOpen(false);
-                  }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px]">{p.fullName}</div>
-                    {(p.company || p.role) && (
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {[p.role, p.company].filter(Boolean).join(" · ")}
-                      </div>
-                    )}
-                  </div>
-                  {p.id === selectedId && <Check className="h-3 w-3 text-accent" />}
-                </CommandItem>
-              ))}
+              .map((p) => {
+                const pick = () => {
+                  onPick(p.id);
+                  setOpen(false);
+                };
+                return (
+                  <CommandItem
+                    key={p.id}
+                    value={`${p.fullName} ${p.company ?? ""} ${p.role ?? ""} ${(p.aliases ?? []).join(" ")} ${(p.tags ?? []).join(" ")}`}
+                    onSelect={pick}
+                    onMouseDown={(e) => {
+                      // cmdk inside a Radix Popover sometimes drops mouse
+                      // onSelect because focus shuffles between input and
+                      // item on pointerdown. Fire on mousedown ourselves.
+                      e.preventDefault();
+                      pick();
+                    }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px]">{p.fullName}</div>
+                      {(p.company || p.role) && (
+                        <div className="truncate text-[11px] text-muted-foreground">
+                          {[p.role, p.company].filter(Boolean).join(" · ")}
+                        </div>
+                      )}
+                    </div>
+                    {p.id === selectedId && <Check className="h-3 w-3 text-accent" />}
+                  </CommandItem>
+                );
+              })}
           </CommandList>
         </Command>
       </PopoverContent>

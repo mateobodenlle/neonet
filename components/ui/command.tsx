@@ -1,15 +1,26 @@
 "use client";
 import * as React from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import { cn } from "@/lib/utils";
+import { cn, foldText } from "@/lib/utils";
+
+// Accent-insensitive substring filter — "marian" matches "Marián",
+// "outeirino" matches "Outeiriño". Returns 1 for any substring hit so
+// cmdk's natural ordering (option order) wins on ties.
+function defaultFilter(value: string, search: string, keywords?: string[]): number {
+  const needle = foldText(search);
+  if (!needle) return 1;
+  const haystack = foldText(value + " " + (keywords ?? []).join(" "));
+  return haystack.includes(needle) ? 1 : 0;
+}
 
 export const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive>
->(({ className, ...props }, ref) => (
+>(({ className, filter, ...props }, ref) => (
   <CommandPrimitive
     ref={ref}
     className={cn("flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground", className)}
+    filter={filter ?? defaultFilter}
     {...props}
   />
 ));

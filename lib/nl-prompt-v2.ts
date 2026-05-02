@@ -214,13 +214,24 @@ export function compactContextObservations(rows: ContextObservation[]): string {
 
 /**
  * The system prompt is built so the prefix is stable across calls (helps
- * OpenAI cache hit rate). Order: rules → directory → context observations.
+ * OpenAI cache hit rate). Order: rules → about-you → directory → context.
  * The volatile parts (today's date, optional subject addendum, the user's
  * note) go in the user message.
+ *
+ * `aboutYou` is the compact me_profile block (see compactAboutYou). When
+ * null, falls back to a hardcoded mini-bio so the prompt still works on a
+ * fresh DB.
  */
-export function systemPromptV2(directory: string, contextObs: string): string {
+export function systemPromptV2(
+  directory: string,
+  contextObs: string,
+  aboutYou: string | null = null
+): string {
+  const aboutBlock = aboutYou
+    ? `Eres el extractor de entidades para Neonet, el CRM personal del usuario.\n\n## ${aboutYou}`
+    : "Eres el extractor de entidades para Neonet, el CRM personal de Mateo Bodenlle (cofundador de OSIX Tech y Shearn, basado en Santiago de Compostela).";
   return [
-    "Eres el extractor de entidades para Neonet, el CRM personal de Mateo Bodenlle (cofundador de OSIX Tech y Shearn, basado en Santiago de Compostela).",
+    aboutBlock,
     "",
     "Recibirás una nota corta en español (puede mezclar gallego), totalmente desestructurada. Tu trabajo es extraer **observaciones atómicas** sobre personas — un hecho discreto = una observación. NO mezcles hechos en una sola observación.",
     "",
@@ -278,7 +289,8 @@ export function systemPromptV2(directory: string, contextObs: string): string {
     "",
     "- No inventes contexto: si la nota no menciona algo, no lo crees.",
     "- Una observación = un hecho. \"Tiene 3 hijos y vive en Vigo\" → 2 observaciones.",
-    "- Direcciones de promesa: `yo-a-el` si Mateo se compromete; `el-a-mi` si la otra parte se compromete con Mateo.",
+    "- Direcciones de promesa: `yo-a-el` si el usuario se compromete; `el-a-mi` si la otra parte se compromete con el usuario.",
+    "- **El usuario NO es un contacto.** Nunca emitas una observación cuyo `primary_mention` sea el usuario, ni lo añadas como participante. Sus acciones (\"yo le mandé X\", \"hablé con Y\") quedan implícitas como contexto del hecho sobre el OTRO. Si la nota es 100% sobre el usuario sin involucrar a nadie más, no emitas nada y mete un warning. El directorio NO contiene al usuario aunque su nombre aparezca en la nota.",
     "",
     "## Directorio de contactos (id | nombre [/alias] | empresa – rol | tags | prior:N :: snippet del perfil) — ORDENADO POR PRIOR DESCENDENTE",
     "",

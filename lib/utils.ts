@@ -5,6 +5,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Lowercase + strip combining diacritics. Use for any free-text search so
+ * "marian" matches "Marián", "outeirino" matches "Outeiriño", "rio" matches
+ * "Río". Note that ñ also folds to n under NFD — desirable for search.
+ */
+export function foldText(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
 export function initials(name: string) {
   return name
     .split(" ")
