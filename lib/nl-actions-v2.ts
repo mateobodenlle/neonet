@@ -25,6 +25,7 @@ import {
   type DirectoryRowV2,
   type ContextObservation,
 } from "./nl-prompt-v2";
+import { getMeProfileSummary, compactAboutYou } from "./me-profile";
 import {
   persistPerson,
   persistObservation,
@@ -51,13 +52,15 @@ import { vectorToWire } from "./mappers";
 
 // ---------- directory + context retrieval ----------
 
-async function loadDirectory(): Promise<DirectoryRowV2[]> {
+async function loadDirectory(excludePersonId?: string | null): Promise<DirectoryRowV2[]> {
   // Left join with person_profiles to pick up the narrative snippet. Two
   // round-trips kept simple — both tables are small.
-  const { data: people, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("people")
     .select("id, full_name, aliases, company, role, tags, closeness, prior_score")
     .eq("archived", false);
+  if (excludePersonId) query = query.neq("id", excludePersonId);
+  const { data: people, error } = await query;
   if (error) throw error;
   const ids = (people ?? []).map((p) => p.id);
   const { data: profiles } = await supabaseAdmin
@@ -196,12 +199,15 @@ export async function extractFromNoteV2(
   today: string
 ): Promise<ExtractionV2> {
   if (!text.trim()) throw new Error("Empty note");
-  const directoryRows = await loadDirectory();
+  const me = await getMeProfileSummary();
+  const directoryRows = await loadDirectory(me?.linkedPersonId ?? null);
   const directory = compactDirectoryV2(directoryRows);
+  const aboutYou = compactAboutYou(me);
   const contextObs = await loadContextObservations(text);
   const systemContent = systemPromptV2(
     directory,
-    compactContextObservations(contextObs)
+    compactContextObservations(contextObs),
+    aboutYou
   );
   const userContent = `Hoy es ${today}.\n\n## Nota\n${text.trim()}`;
   return runExtraction({
@@ -223,14 +229,17 @@ export async function extractForPersonV2(
   today: string
 ): Promise<ExtractionV2> {
   if (!text.trim()) throw new Error("Empty note");
-  const directoryRows = await loadDirectory();
+  const me = await getMeProfileSummary();
+  const directoryRows = await loadDirectory(me?.linkedPersonId ?? null);
   const subject = directoryRows.find((d) => d.id === personId);
   if (!subject) throw new Error(`Subject person not found: ${personId}`);
   const directory = compactDirectoryV2(directoryRows);
+  const aboutYou = compactAboutYou(me);
   const contextObs = await loadContextObservations(text);
   const systemContent = systemPromptV2(
     directory,
-    compactContextObservations(contextObs)
+    compactContextObservations(contextObs),
+    aboutYou
   );
   const userContent = [
     `Hoy es ${today}.`,

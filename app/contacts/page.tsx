@@ -17,7 +17,7 @@ import { Search, MoreHorizontal, Pencil, Archive, ArchiveRestore, Trash2, Combin
 import { AddContactDialog, ContactDialog } from "@/components/add-contact-dialog";
 import { MergeContactsDialog } from "@/components/merge-contacts-dialog";
 import type { Category, Sector, Temperature, Person } from "@/lib/types";
-import { relativeDate } from "@/lib/utils";
+import { relativeDate, foldText } from "@/lib/utils";
 
 type SortBy = "recency" | "alpha" | "affinity" | "encounters";
 
@@ -51,7 +51,7 @@ export default function ContactsPage() {
   }, [encounters]);
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = foldText(q.trim());
     let list = people.filter((p) => {
       if (!showArchived && p.archived) return false;
       if (showArchived && !p.archived) return false;
@@ -59,10 +59,11 @@ export default function ContactsPage() {
       if (temp !== "todas" && p.temperature !== temp) return false;
       if (sector !== "todos" && p.sector !== sector) return false;
       if (!needle) return true;
-      const hay = [p.fullName, p.role, p.company, p.location, ...(p.tags ?? []), ...(p.aliases ?? [])]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+      const hay = foldText(
+        [p.fullName, p.role, p.company, p.location, ...(p.tags ?? []), ...(p.aliases ?? [])]
+          .filter(Boolean)
+          .join(" ")
+      );
       return hay.includes(needle);
     });
 
@@ -160,7 +161,12 @@ export default function ContactsPage() {
             {filtered.length} de {people.length}{showArchived ? ` archivados` : ""}
           </p>
         </div>
-        <AddContactDialog />
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/contacts/review">Revisar conexiones</Link>
+          </Button>
+          <AddContactDialog />
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-2">

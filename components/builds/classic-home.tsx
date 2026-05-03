@@ -25,8 +25,13 @@ export function ClassicHome() {
   const dormant = d.db.people
     .filter((p) => !p.archived)
     .map((p) => {
-      const last = d.getEncountersByPerson(p.id)[0];
-      return { person: p, days: last ? daysBetween(last.date) : 9999 };
+      const lastEncounter = d.getEncountersByPerson(p.id)[0]?.date;
+      const lastObs = p.lastObservationAt?.slice(0, 10);
+      const lastActivity = [lastEncounter, lastObs]
+        .filter((x): x is string => !!x)
+        .sort()
+        .pop();
+      return { person: p, days: lastActivity ? daysBetween(lastActivity) : 9999 };
     })
     .filter((x) => x.days > 90 && x.person.category !== "otro" && x.person.temperature !== "frio")
     .sort((a, b) => b.days - a.days)

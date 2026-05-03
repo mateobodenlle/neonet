@@ -311,9 +311,9 @@ export async function deletePromiseObservation(
 }
 
 /**
- * Manually create a new promesa observation (from the AddPromiseDialog).
- * `alsoPersonIds` get role='promise_target' alongside the primary, mirroring
- * what the v2 NL extractor emits.
+ * Manually create a new promesa observation (from the inline PromiseDialog
+ * in the pendientes UI). `alsoPersonIds` get role='promise_target' alongside
+ * the primary, mirroring what the v2 NL extractor emits.
  */
 export async function createPromiseObservation(input: {
   primaryPersonId: string;

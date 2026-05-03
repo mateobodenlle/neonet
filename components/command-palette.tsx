@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
+import { foldText } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { PersonAvatar } from "@/components/person-avatar";
@@ -39,10 +40,10 @@ export function CommandPalette() {
 
   const matchedNotes = useMemo(() => {
     if (!q.trim()) return [];
-    const needle = q.toLowerCase();
+    const needle = foldText(q);
     return interactions
       .filter((i) => i.kind !== "encuentro")
-      .filter((i) => i.summary.toLowerCase().includes(needle) || i.body?.toLowerCase().includes(needle))
+      .filter((i) => foldText(i.summary).includes(needle) || foldText(i.body).includes(needle))
       .slice(0, 5);
   }, [q, interactions]);
 
@@ -106,10 +107,14 @@ export function CommandPalette() {
 function PeopleMatches({ q, people, onGo }: { q: string; people: ReturnType<typeof useStore.getState>["people"]; onGo: (p: string) => void }) {
   const matched = useMemo(() => {
     if (!q.trim()) return people.slice(0, 6);
-    const needle = q.toLowerCase();
+    const needle = foldText(q);
     return people
       .filter((p) => {
-        const hay = [p.fullName, p.company, p.role, p.location, ...(p.aliases ?? []), ...(p.tags ?? [])].filter(Boolean).join(" ").toLowerCase();
+        const hay = foldText(
+          [p.fullName, p.company, p.role, p.location, ...(p.aliases ?? []), ...(p.tags ?? [])]
+            .filter(Boolean)
+            .join(" ")
+        );
         return hay.includes(needle);
       })
       .slice(0, 8);
@@ -134,8 +139,10 @@ function PeopleMatches({ q, people, onGo }: { q: string; people: ReturnType<type
 function EventMatches({ q, events, onGo }: { q: string; events: ReturnType<typeof useStore.getState>["events"]; onGo: (p: string) => void }) {
   const matched = useMemo(() => {
     if (!q.trim()) return [];
-    const needle = q.toLowerCase();
-    return events.filter((e) => e.name.toLowerCase().includes(needle) || e.location?.toLowerCase().includes(needle)).slice(0, 4);
+    const needle = foldText(q);
+    return events
+      .filter((e) => foldText(e.name).includes(needle) || foldText(e.location).includes(needle))
+      .slice(0, 4);
   }, [q, events]);
 
   if (matched.length === 0) return null;
