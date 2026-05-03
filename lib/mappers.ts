@@ -6,8 +6,6 @@ import type {
   Event as DomainEvent,
   Encounter,
   Interaction,
-  PainPoint,
-  Promise as DomainPromise,
   Edge,
   SocialHandles,
   Category,
@@ -26,8 +24,6 @@ import type {
   EventRow,
   EncounterRow,
   InteractionRow,
-  PainPointRow,
-  PromiseRow,
   EdgeRow,
   ObservationRow,
   ObservationParticipantRow,
@@ -178,60 +174,6 @@ export function interactionToRow(i: Interaction): Omit<InteractionRow, "created_
     summary: i.summary,
     body: i.body ?? null,
     encounter_id: i.encounterId ?? null,
-  };
-}
-
-// pain_points ----------------------------------------------------------
-export function painPointFromRow(r: PainPointRow): PainPoint {
-  return {
-    id: r.id,
-    personId: r.person_id,
-    description: r.description,
-    createdAt: r.created_at,
-    sourceEncounterId: r.source_encounter_id ?? undefined,
-    sourceInteractionId: r.source_interaction_id ?? undefined,
-    resolved: r.resolved,
-  };
-}
-
-export function painPointToRow(p: PainPoint): Omit<PainPointRow, "created_at"> & { created_at?: string } {
-  return {
-    id: p.id,
-    person_id: p.personId,
-    description: p.description,
-    source_encounter_id: p.sourceEncounterId ?? null,
-    source_interaction_id: p.sourceInteractionId ?? null,
-    resolved: p.resolved ?? false,
-    created_at: p.createdAt,
-  };
-}
-
-// promises -------------------------------------------------------------
-export function promiseFromRow(r: PromiseRow): DomainPromise {
-  return {
-    id: r.id,
-    personId: r.person_id,
-    alsoPersonIds: r.also_person_ids ?? [],
-    description: r.description,
-    direction: r.direction,
-    dueDate: r.due_date ?? undefined,
-    done: r.done,
-    createdAt: r.created_at,
-    completedAt: r.completed_at ?? undefined,
-  };
-}
-
-export function promiseToRow(p: DomainPromise): Omit<PromiseRow, "created_at"> & { created_at?: string } {
-  return {
-    id: p.id,
-    person_id: p.personId,
-    also_person_ids: p.alsoPersonIds ?? [],
-    description: p.description,
-    direction: p.direction,
-    due_date: p.dueDate ?? null,
-    done: p.done,
-    completed_at: p.completedAt ?? null,
-    created_at: p.createdAt,
   };
 }
 

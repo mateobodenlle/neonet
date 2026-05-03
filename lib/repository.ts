@@ -11,8 +11,6 @@ import type {
   Encounter,
   Interaction,
   Event,
-  PainPoint,
-  Promise as DomainPromise,
   Edge,
   Observation,
   ObservationParticipant,
@@ -30,16 +28,11 @@ export interface Repository {
   getEvent(id: string): Event | undefined;
   getEncountersByPerson(personId: string): Encounter[];
   getInteractionsByPerson(personId: string): Interaction[];
-  getPainPointsByPerson(personId: string): PainPoint[];
-  getPromisesByPerson(personId: string): DomainPromise[];
   getEdgesForPerson(personId: string): Edge[];
   getPeopleByEvent(eventId: string): Person[];
   addPerson(p: Person): void;
   addEncounter(en: Encounter): void;
   addInteraction(i: Interaction): void;
-  addPainPoint(pp: PainPoint): void;
-  addPromise(pr: DomainPromise): void;
-  togglePromise(id: string): void;
 }
 
 // observations queries ---------------------------------------------------
