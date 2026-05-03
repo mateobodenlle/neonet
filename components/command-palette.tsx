@@ -7,14 +7,13 @@ import { foldText } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { PersonAvatar } from "@/components/person-avatar";
-import { CalendarDays, Users, MessageSquare, TriangleAlert, Plus } from "lucide-react";
+import { CalendarDays, Users, MessageSquare } from "lucide-react";
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const people = useStore((s) => s.people);
   const events = useStore((s) => s.events);
-  const painPoints = useStore((s) => s.painPoints);
   const interactions = useStore((s) => s.interactions);
   const [q, setQ] = useState("");
 
@@ -39,12 +38,6 @@ export function CommandPalette() {
     setQ("");
   };
 
-  const matchedPainPoints = useMemo(() => {
-    if (!q.trim()) return [];
-    const needle = foldText(q);
-    return painPoints.filter((pp) => foldText(pp.description).includes(needle)).slice(0, 5);
-  }, [q, painPoints]);
-
   const matchedNotes = useMemo(() => {
     if (!q.trim()) return [];
     const needle = foldText(q);
@@ -60,7 +53,7 @@ export function CommandPalette() {
         <DialogTitle className="sr-only">Buscar</DialogTitle>
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Buscar contactos, empresas, pain points, notas..."
+            placeholder="Buscar contactos, empresas, notas..."
             value={q}
             onValueChange={setQ}
           />
@@ -80,26 +73,6 @@ export function CommandPalette() {
 
             <PeopleMatches q={q} people={people} onGo={go} />
             <EventMatches q={q} events={events} onGo={go} />
-
-            {matchedPainPoints.length > 0 && (
-              <>
-                <CommandSeparator />
-                <CommandGroup heading="Pain points">
-                  {matchedPainPoints.map((pp) => {
-                    const person = people.find((p) => p.id === pp.personId);
-                    return (
-                      <CommandItem key={pp.id} onSelect={() => go(`/contacts/${pp.personId}`)}>
-                        <TriangleAlert className="h-3.5 w-3.5 text-amber-500" />
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px]">{pp.description}</div>
-                          <div className="truncate text-[11px] text-muted-foreground">{person?.fullName}</div>
-                        </div>
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              </>
-            )}
 
             {matchedNotes.length > 0 && (
               <>

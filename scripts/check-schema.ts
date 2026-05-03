@@ -15,7 +15,7 @@ const db = createClient(url, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const tables = ["people", "events", "encounters", "interactions", "pain_points", "promises", "edges"] as const;
+const tables = ["people", "events", "encounters", "interactions", "edges", "observations", "observation_participants", "person_profiles"] as const;
 
 async function main() {
   let missing = 0;

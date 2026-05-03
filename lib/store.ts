@@ -7,8 +7,6 @@ import type {
   Person,
   Encounter,
   Interaction,
-  PainPoint,
-  Promise as DomainPromise,
   Edge,
   Event as DomainEvent,
 } from "./types";
@@ -28,13 +26,6 @@ import {
   persistInteraction,
   deleteInteractionAction,
   restoreInteractionAction,
-  persistPainPoint,
-  deletePainPointAction,
-  restorePainPointAction,
-  persistPromise,
-  deletePromiseAction,
-  restorePromiseAction,
-  togglePromiseAction,
   persistEvent,
   deleteEventAction,
   restoreEventAction,
@@ -46,8 +37,6 @@ import {
 interface RelatedSnapshot {
   encounters: Encounter[];
   interactions: Interaction[];
-  painPoints: PainPoint[];
-  promises: DomainPromise[];
   edges: Edge[];
 }
 
@@ -77,17 +66,6 @@ interface Actions {
   deleteInteraction: (id: string) => Interaction | null;
   restoreInteraction: (i: Interaction) => void;
 
-  addPainPoint: (p: PainPoint) => void;
-  updatePainPoint: (id: string, patch: Partial<PainPoint>) => void;
-  deletePainPoint: (id: string) => PainPoint | null;
-  restorePainPoint: (p: PainPoint) => void;
-
-  addPromise: (p: DomainPromise) => void;
-  updatePromise: (id: string, patch: Partial<DomainPromise>) => void;
-  deletePromise: (id: string) => DomainPromise | null;
-  restorePromise: (p: DomainPromise) => void;
-  togglePromise: (id: string) => void;
-
   addEvent: (e: DomainEvent) => void;
   updateEvent: (id: string, patch: Partial<DomainEvent>) => void;
   deleteEvent: (id: string) => DomainEvent | null;
@@ -103,8 +81,6 @@ const empty: Database = {
   events: [],
   encounters: [],
   interactions: [],
-  painPoints: [],
-  promises: [],
   edges: [],
 };
 
@@ -161,22 +137,12 @@ export const useStore = create<Database & SyncState & Actions>()((set, get) => (
     const related: RelatedSnapshot = {
       encounters: s.encounters.filter((e) => e.personId === id),
       interactions: s.interactions.filter((i) => i.personId === id),
-      painPoints: s.painPoints.filter((p) => p.personId === id),
-      promises: s.promises.filter((p) => p.personId === id || (p.alsoPersonIds ?? []).includes(id)),
       edges: s.edges.filter((e) => e.fromPersonId === id || e.toPersonId === id),
     };
     set({
       people: s.people.filter((p) => p.id !== id),
       encounters: s.encounters.filter((e) => e.personId !== id),
       interactions: s.interactions.filter((i) => i.personId !== id),
-      painPoints: s.painPoints.filter((p) => p.personId !== id),
-      promises: s.promises
-        .map((p) =>
-          (p.alsoPersonIds ?? []).includes(id)
-            ? { ...p, alsoPersonIds: (p.alsoPersonIds ?? []).filter((x) => x !== id) }
-            : p
-        )
-        .filter((p) => p.personId !== id),
       edges: s.edges.filter((e) => e.fromPersonId !== id && e.toPersonId !== id),
     });
     syncFireAndForget("borrar contacto", () => deletePersonAction(id));
@@ -192,13 +158,6 @@ export const useStore = create<Database & SyncState & Actions>()((set, get) => (
       people: s.people.filter((p) => !idSet.has(p.id)),
       encounters: s.encounters.filter((e) => !idSet.has(e.personId)),
       interactions: s.interactions.filter((i) => !idSet.has(i.personId)),
-      painPoints: s.painPoints.filter((p) => !idSet.has(p.personId)),
-      promises: s.promises
-        .map((p) => ({
-          ...p,
-          alsoPersonIds: (p.alsoPersonIds ?? []).filter((x) => !idSet.has(x)),
-        }))
-        .filter((p) => !idSet.has(p.personId)),
       edges: s.edges.filter(
         (e) => !idSet.has(e.fromPersonId) && !idSet.has(e.toPersonId)
       ),
@@ -262,8 +221,6 @@ export const useStore = create<Database & SyncState & Actions>()((set, get) => (
       people: [person, ...s.people],
       encounters: [...related.encounters, ...s.encounters],
       interactions: [...related.interactions, ...s.interactions],
-      painPoints: [...related.painPoints, ...s.painPoints],
-      promises: [...related.promises, ...s.promises],
       edges: [...related.edges, ...s.edges],
     }));
     syncFireAndForget("restaurar contacto", () => restorePersonAction(person, related));
@@ -348,70 +305,6 @@ export const useStore = create<Database & SyncState & Actions>()((set, get) => (
     syncFireAndForget("restaurar nota", () => restoreInteractionAction(i));
   },
 
-  // pain_points ---------------------------------------------------------
-  addPainPoint: (p) => {
-    set((s) => ({ painPoints: [p, ...s.painPoints] }));
-    syncFireAndForget("crear pain point", () => persistPainPoint(p));
-  },
-  updatePainPoint: (id, patch) => {
-    set((s) => ({
-      painPoints: s.painPoints.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-    }));
-    const next = get().painPoints.find((p) => p.id === id);
-    if (next) syncFireAndForget("actualizar pain point", () => persistPainPoint(next));
-  },
-  deletePainPoint: (id) => {
-    const s = get();
-    const pp = s.painPoints.find((p) => p.id === id);
-    if (!pp) return null;
-    set({ painPoints: s.painPoints.filter((p) => p.id !== id) });
-    syncFireAndForget("borrar pain point", () => deletePainPointAction(id));
-    return pp;
-  },
-  restorePainPoint: (p) => {
-    set((s) => ({ painPoints: [p, ...s.painPoints] }));
-    syncFireAndForget("restaurar pain point", () => restorePainPointAction(p));
-  },
-
-  // promises ------------------------------------------------------------
-  addPromise: (p) => {
-    set((s) => ({ promises: [p, ...s.promises] }));
-    syncFireAndForget("crear compromiso", () => persistPromise(p));
-  },
-  updatePromise: (id, patch) => {
-    set((s) => ({
-      promises: s.promises.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-    }));
-    const next = get().promises.find((p) => p.id === id);
-    if (next) syncFireAndForget("actualizar compromiso", () => persistPromise(next));
-  },
-  deletePromise: (id) => {
-    const s = get();
-    const pr = s.promises.find((p) => p.id === id);
-    if (!pr) return null;
-    set({ promises: s.promises.filter((p) => p.id !== id) });
-    syncFireAndForget("borrar compromiso", () => deletePromiseAction(id));
-    return pr;
-  },
-  restorePromise: (p) => {
-    set((s) => ({ promises: [p, ...s.promises] }));
-    syncFireAndForget("restaurar compromiso", () => restorePromiseAction(p));
-  },
-  togglePromise: (id) => {
-    set((s) => ({
-      promises: s.promises.map((pr) =>
-        pr.id === id
-          ? {
-              ...pr,
-              done: !pr.done,
-              completedAt: !pr.done ? new Date().toISOString() : undefined,
-            }
-          : pr
-      ),
-    }));
-    syncFireAndForget("marcar compromiso", () => togglePromiseAction(id));
-  },
-
   // events --------------------------------------------------------------
   addEvent: (e) => {
     set((s) => ({ events: [e, ...s.events] }));
@@ -467,9 +360,6 @@ export function useDerived() {
       db.encounters.filter((en) => en.personId === pid).sort((a, b) => b.date.localeCompare(a.date)),
     getInteractionsByPerson: (pid: string) =>
       db.interactions.filter((i) => i.personId === pid).sort((a, b) => b.date.localeCompare(a.date)),
-    getPainPointsByPerson: (pid: string) => db.painPoints.filter((p) => p.personId === pid),
-    getPromisesByPerson: (pid: string) =>
-      db.promises.filter((p) => p.personId === pid || (p.alsoPersonIds ?? []).includes(pid)),
     getEdgesForPerson: (pid: string) =>
       db.edges.filter((e) => e.fromPersonId === pid || e.toPersonId === pid),
     getPeopleByEvent: (eid: string) => {

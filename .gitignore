@@ -22,6 +22,7 @@ Thumbs.db
 .idea
 *.swp
 .claude
+.mcp.json
 
 # next
 next-env.d.ts

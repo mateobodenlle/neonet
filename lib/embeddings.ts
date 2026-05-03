@@ -17,22 +17,47 @@ import { openai, EMBEDDING_MODEL } from "./openai";
 import { supabaseAdmin } from "./supabase-admin";
 import { observationFromRow, personProfileFromRow, vectorToWire } from "./mappers";
 import type { Observation, PersonProfile } from "./types";
+import { withLlmLogging, type LlmPurpose } from "./llm-observability";
 
 export interface EmbedResult {
   vector: number[];
   model: string;
 }
 
-export async function embedText(text: string): Promise<EmbedResult> {
+export interface EmbedTextOpts {
+  purpose?: LlmPurpose;
+  personIds?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export async function embedText(
+  text: string,
+  opts: EmbedTextOpts = {},
+): Promise<EmbedResult> {
   const trimmed = text.trim();
   if (!trimmed) throw new Error("embedText: empty input");
-  const r = await openai.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: trimmed,
-  });
-  const vec = r.data[0]?.embedding;
-  if (!vec) throw new Error("embedText: empty response");
-  return { vector: vec, model: EMBEDDING_MODEL };
+  return withLlmLogging(
+    {
+      purpose: opts.purpose ?? "embedding-query",
+      model: EMBEDDING_MODEL,
+      personIds: opts.personIds,
+      metadata: { text_length: trimmed.length, ...(opts.metadata ?? {}) },
+    },
+    async () => {
+      const r = await openai.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: trimmed,
+      });
+      const vec = r.data[0]?.embedding;
+      if (!vec) throw new Error("embedText: empty response");
+      return {
+        result: { vector: vec, model: EMBEDDING_MODEL } as EmbedResult,
+        usage: r.usage
+          ? { prompt_tokens: r.usage.prompt_tokens, total_tokens: r.usage.total_tokens }
+          : undefined,
+      };
+    },
+  );
 }
 
 export async function embedTexts(texts: string[]): Promise<EmbedResult[]> {
@@ -61,7 +86,10 @@ export async function embedObservation(observationId: string): Promise<void> {
       ? String((data.facets as Record<string, unknown>).type)
       : null;
   const input = facetType ? `[${facetType}] ${data.content}` : data.content;
-  const { vector, model } = await embedText(input);
+  const { vector, model } = await embedText(input, {
+    purpose: "embedding-observation",
+    metadata: { observation_id: observationId, facet_type: facetType },
+  });
   const { error: ue } = await supabaseAdmin
     .from("observations")
     .update({ embedding: vectorToWire(vector), embedding_model: model })
@@ -81,7 +109,10 @@ export async function embedProfile(personId: string): Promise<void> {
     ? `${data.narrative}\n\nThemes: ${themes}`
     : data.narrative;
   if (!input.trim()) return; // empty profile, nothing to embed
-  const { vector, model } = await embedText(input);
+  const { vector, model } = await embedText(input, {
+    purpose: "embedding-profile",
+    personIds: [personId],
+  });
   const { error: ue } = await supabaseAdmin
     .from("person_profiles")
     .update({ embedding: vectorToWire(vector), embedding_model: model })

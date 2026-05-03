@@ -14,7 +14,7 @@ export const EXTRACTION_MODEL =
 // Synthesis is the highest-leverage path — its output is the directory
 // snippet every extraction sees. Quality matters more than per-call cost.
 export const SYNTHESIS_MODEL =
-  process.env.OPENAI_SYNTHESIS_MODEL ?? "gpt-4o";
+  process.env.OPENAI_SYNTHESIS_MODEL ?? "gpt-5";
 
 // Reserved for future RAG-style rerank passes.
 export const RERANK_MODEL =
