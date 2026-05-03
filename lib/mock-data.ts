@@ -1,4 +1,4 @@
-import type { Database, Person, Event, Encounter, Interaction, PainPoint, Promise, Edge } from "./types";
+import type { Database, Person, Event, Encounter, Interaction, Edge } from "./types";
 
 const people: Person[] = [
   {
@@ -917,39 +917,6 @@ const encounters: Encounter[] = [
   { id: "en102", personId: "p40", date: "2026-01-18", location: "Café", context: "Catch up personal." },
 ];
 
-const painPoints: PainPoint[] = [
-  { id: "pp1", personId: "p1", description: "Gestión de stock manual en 42 tiendas. Desperdicio >8%", createdAt: "2025-07-22", sourceInteractionId: "i2" },
-  { id: "pp2", personId: "p1", description: "Problemas con reconteos: errores de cuadratura constantes.", createdAt: "2025-11-12" },
-  { id: "pp3", personId: "p5", description: "Previsión de demanda con Excel, error ~22% en SKUs estacionales.", createdAt: "2025-10-15" },
-  { id: "pp4", personId: "p5", description: "Optimización de rutas se hace a ojo por el jefe de flota.", createdAt: "2025-12-03" },
-  { id: "pp5", personId: "p7", description: "Fraude transaccional con modelos viejos, tasa de falsos positivos alta.", createdAt: "2025-05-20" },
-  { id: "pp6", personId: "p10", description: "90% de siniestros tramitados a mano, time-to-close alto.", createdAt: "2025-10-15" },
-  { id: "pp7", personId: "p15", description: "Paradas inesperadas de CNC cuestan 80k€ al mes.", createdAt: "2026-01-25" },
-  { id: "pp8", personId: "p15", description: "Proceso de facturación manual con proveedores, media 6 min/factura.", createdAt: "2026-04-11" },
-  { id: "pp9", personId: "p24", description: "Despliegue de LLMs bloqueado por compliance interno. Necesita governance clara.", createdAt: "2026-04-13" },
-  { id: "pp10", personId: "p26", description: "Tasa de churn del 14% y sin modelo predictivo funcional.", createdAt: "2026-03-18" },
-  { id: "pp11", personId: "p32", description: "Búsqueda visual actual no aprovecha imagen de catálogo propio.", createdAt: "2026-02-28" },
-  { id: "pp12", personId: "p38", description: "Agendas de clínicas no-shows 18%, sin recordatorios inteligentes.", createdAt: "2026-03-01" },
-  { id: "pp13", personId: "p21", description: "Datos de sensores IoT silenciados en CSVs, sin pipeline.", createdAt: "2026-03-10" },
-  { id: "pp14", personId: "p11", description: "Quieren lanzar agente de soporte pero no saben por dónde empezar.", createdAt: "2026-03-30" },
-  { id: "pp15", personId: "p29", description: "Rule-based actual de LegalGPT escala mal, quieren pasar a RAG.", createdAt: "2026-03-06" },
-];
-
-const promises: Promise[] = [
-  { id: "pr1", personId: "p1", description: "Enviar propuesta de POC inventario", direction: "yo-a-el", dueDate: "2026-04-22", done: false, createdAt: "2026-04-08" },
-  { id: "pr2", personId: "p4", description: "Mandar update trimestral", direction: "yo-a-el", dueDate: "2026-05-01", done: false, createdAt: "2026-03-02" },
-  { id: "pr3", personId: "p4", description: "Intro a Carmen Aguirre (Mapfre)", direction: "el-a-mi", dueDate: "2026-04-25", done: false, createdAt: "2026-03-02" },
-  { id: "pr4", personId: "p5", description: "Firmar NDA POC", direction: "yo-a-el", done: true, createdAt: "2026-02-19" },
-  { id: "pr5", personId: "p13", description: "Mandar oferta formal por email", direction: "yo-a-el", dueDate: "2026-04-21", done: false, createdAt: "2026-04-14" },
-  { id: "pr6", personId: "p15", description: "Agendar visita planta", direction: "yo-a-el", dueDate: "2026-05-10", done: false, createdAt: "2026-04-11" },
-  { id: "pr7", personId: "p17", description: "Enviarle estructura del advisory", direction: "yo-a-el", dueDate: "2026-04-24", done: false, createdAt: "2026-04-17" },
-  { id: "pr8", personId: "p24", description: "Preparar deck vertical telco", direction: "yo-a-el", dueDate: "2026-04-20", done: false, createdAt: "2026-04-13" },
-  { id: "pr9", personId: "p32", description: "Enviar borrador de plan POC visual search", direction: "yo-a-el", dueDate: "2026-04-23", done: false, createdAt: "2026-04-15" },
-  { id: "pr10", personId: "p10", description: "Presentarme formalmente vía email", direction: "el-a-mi", dueDate: "2026-04-19", done: false, createdAt: "2026-03-28" },
-  { id: "pr11", personId: "p8", description: "Compartir grabación de ponencia", direction: "yo-a-el", done: true, createdAt: "2026-03-22" },
-  { id: "pr12", personId: "p3", description: "Primer borrador términos JV pharma", direction: "yo-a-el", dueDate: "2026-04-30", done: false, createdAt: "2026-04-15" },
-];
-
 const interactions: Interaction[] = encounters.map((en, idx) => ({
   id: `i${idx + 1}`,
   personId: en.personId,
@@ -998,7 +965,5 @@ export const mockDatabase: Database = {
   events,
   encounters,
   interactions,
-  painPoints,
-  promises,
   edges,
 };

@@ -16,6 +16,7 @@ import "server-only";
 import { openai, SYNTHESIS_MODEL } from "./openai";
 import { supabaseAdmin } from "./supabase-admin";
 import { embedProfile } from "./embeddings";
+import { withLlmLogging, type LlmPurpose } from "./llm-observability";
 import {
   PROFILE_SCHEMA,
   profileSystemPrompt,
@@ -106,33 +107,58 @@ interface LLMOut {
   active_threads: Array<{ title: string; status: string }>;
 }
 
-async function callSynthesis(inputs: SynthesisInputs): Promise<LLMOut> {
+interface CallSynthesisOpts {
+  purpose: LlmPurpose;
+  personId: string;
+}
+
+async function callSynthesis(
+  inputs: SynthesisInputs,
+  opts: CallSynthesisOpts,
+): Promise<LLMOut> {
   const today = new Date().toISOString().slice(0, 10);
-  const completion = await openai.chat.completions.create({
-    model: SYNTHESIS_MODEL,
-    temperature: 0.2,
-    response_format: { type: "json_schema", json_schema: PROFILE_SCHEMA as never },
-    messages: [
-      { role: "system", content: profileSystemPrompt(today) },
-      {
-        role: "user",
-        content: profileUserMessage({
-          fullName: inputs.person.full_name,
-          basics: {
-            role: inputs.person.role ?? undefined,
-            company: inputs.person.company ?? undefined,
-            location: inputs.person.location ?? undefined,
-            tags: inputs.person.tags,
-          },
-          previousNarrative: inputs.previousNarrative,
-          observations: inputs.observations,
-        }),
+  return withLlmLogging(
+    {
+      purpose: opts.purpose,
+      model: SYNTHESIS_MODEL,
+      personIds: [opts.personId],
+      metadata: {
+        observations_count: inputs.observationsCount,
+        observations_sent: inputs.observations.length,
+        had_previous_narrative: inputs.previousNarrative != null,
       },
-    ],
-  });
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error("Empty synthesis response");
-  return JSON.parse(raw) as LLMOut;
+    },
+    async () => {
+      const completion = await openai.chat.completions.create({
+        model: SYNTHESIS_MODEL,
+        temperature: 0.2,
+        response_format: { type: "json_schema", json_schema: PROFILE_SCHEMA as never },
+        messages: [
+          { role: "system", content: profileSystemPrompt(today) },
+          {
+            role: "user",
+            content: profileUserMessage({
+              fullName: inputs.person.full_name,
+              basics: {
+                role: inputs.person.role ?? undefined,
+                company: inputs.person.company ?? undefined,
+                location: inputs.person.location ?? undefined,
+                tags: inputs.person.tags,
+              },
+              previousNarrative: inputs.previousNarrative,
+              observations: inputs.observations,
+            }),
+          },
+        ],
+      });
+      const raw = completion.choices[0]?.message?.content;
+      if (!raw) throw new Error("Empty synthesis response");
+      return {
+        result: JSON.parse(raw) as LLMOut,
+        usage: completion.usage ?? undefined,
+      };
+    },
+  );
 }
 
 function parseResolvedFacts(raw: string): Record<string, unknown> {
@@ -185,12 +211,15 @@ export async function synthesizeIncremental(
     loadCurrentProfile(personId),
     loadObservations(personId, MAX_OBSERVATIONS_FOR_INCREMENTAL),
   ]);
-  const out = await callSynthesis({
-    person,
-    previousNarrative: prev?.narrative || null,
-    observations: obs.rows,
-    observationsCount: obs.total,
-  });
+  const out = await callSynthesis(
+    {
+      person,
+      previousNarrative: prev?.narrative || null,
+      observations: obs.rows,
+      observationsCount: obs.total,
+    },
+    { purpose: "synthesis-incremental", personId },
+  );
   return persistSynthesized(personId, out, obs.total);
 }
 
@@ -201,12 +230,15 @@ export async function synthesizeFullRebuild(
     loadPerson(personId),
     loadObservations(personId, 1000),
   ]);
-  const out = await callSynthesis({
-    person,
-    previousNarrative: null,
-    observations: obs.rows,
-    observationsCount: obs.total,
-  });
+  const out = await callSynthesis(
+    {
+      person,
+      previousNarrative: null,
+      observations: obs.rows,
+      observationsCount: obs.total,
+    },
+    { purpose: "synthesis-rebuild", personId },
+  );
   return persistSynthesized(personId, out, obs.total);
 }
 

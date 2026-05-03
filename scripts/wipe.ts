@@ -32,7 +32,7 @@ const db = createClient(url, serviceRoleKey, {
 async function main() {
   // Children first; FK cascades will mostly handle this, but explicit order
   // keeps the script independent of cascade settings.
-  const tables = ["edges", "promises", "pain_points", "interactions", "encounters", "events", "people"] as const;
+  const tables = ["edges", "observation_participants", "observations", "person_profiles", "interactions", "encounters", "events", "people"] as const;
   for (const t of tables) {
     const { error } = await db.from(t).delete().neq("id", "");
     if (error) throw error;

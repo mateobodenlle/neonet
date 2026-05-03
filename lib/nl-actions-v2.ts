@@ -14,6 +14,7 @@
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
 import { openai, EXTRACTION_MODEL } from "./openai";
+import { withLlmLogging, type LlmPurpose } from "./llm-observability";
 import { supabaseAdmin } from "./supabase-admin";
 import { embedText, embedObservation } from "./embeddings";
 import {
@@ -146,6 +147,9 @@ interface RunOpts {
   systemContent: string;
   userContent: string;
   cacheKey: string;
+  purpose: LlmPurpose;
+  personIds?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 async function runExtraction(opts: RunOpts): Promise<ExtractionV2> {
@@ -162,10 +166,23 @@ async function runExtraction(opts: RunOpts): Promise<ExtractionV2> {
     ],
     prompt_cache_key: opts.cacheKey,
   };
-  const completion = await openai.chat.completions.create(body);
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error("Empty response from OpenAI");
-  return JSON.parse(raw) as ExtractionV2;
+  return withLlmLogging(
+    {
+      purpose: opts.purpose,
+      model: EXTRACTION_MODEL,
+      personIds: opts.personIds,
+      metadata: opts.metadata,
+    },
+    async () => {
+      const completion = await openai.chat.completions.create(body);
+      const raw = completion.choices[0]?.message?.content;
+      if (!raw) throw new Error("Empty response from OpenAI");
+      return {
+        result: JSON.parse(raw) as ExtractionV2,
+        usage: completion.usage ?? undefined,
+      };
+    },
+  );
 }
 
 function directoryCacheKey(directory: string): string {
@@ -197,6 +214,12 @@ export async function extractFromNoteV2(
     systemContent,
     userContent,
     cacheKey: directoryCacheKey(directory),
+    purpose: "extraction",
+    metadata: {
+      note_length: text.length,
+      directory_size: directoryRows.length,
+      context_observations: contextObs.length,
+    },
   });
 }
 
@@ -230,6 +253,13 @@ export async function extractForPersonV2(
     systemContent,
     userContent,
     cacheKey: directoryCacheKey(directory),
+    purpose: "extraction-for-person",
+    personIds: [personId],
+    metadata: {
+      note_length: text.length,
+      directory_size: directoryRows.length,
+      context_observations: contextObs.length,
+    },
   });
 }
 

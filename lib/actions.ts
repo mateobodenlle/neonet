@@ -6,20 +6,6 @@ import { useStore } from "./store";
 
 const UNDO_MS = 15_000;
 
-export function useCompletePromise() {
-  const togglePromise = useStore((s) => s.togglePromise);
-  return (promiseId: string, currentlyDone: boolean, personName?: string) => {
-    togglePromise(promiseId);
-    if (!currentlyDone) {
-      toast(personName ? `Completado · ${personName}` : "Completado", {
-        description: "Desaparece del tablero al cerrar.",
-        duration: UNDO_MS,
-        action: { label: "Deshacer", onClick: () => togglePromise(promiseId) },
-      });
-    }
-  };
-}
-
 export function useDeleteContact() {
   const deletePerson = useStore((s) => s.deletePerson);
   const restorePerson = useStore((s) => s.restorePerson);
@@ -60,32 +46,6 @@ export function useDeleteInteraction() {
     toast("Nota eliminada", {
       duration: UNDO_MS,
       action: { label: "Deshacer", onClick: () => restoreInteraction(it) },
-    });
-  };
-}
-
-export function useDeletePainPoint() {
-  const deletePainPoint = useStore((s) => s.deletePainPoint);
-  const restorePainPoint = useStore((s) => s.restorePainPoint);
-  return (id: string) => {
-    const pp = deletePainPoint(id);
-    if (!pp) return;
-    toast("Pain point eliminado", {
-      duration: UNDO_MS,
-      action: { label: "Deshacer", onClick: () => restorePainPoint(pp) },
-    });
-  };
-}
-
-export function useDeletePromise() {
-  const deletePromise = useStore((s) => s.deletePromise);
-  const restorePromise = useStore((s) => s.restorePromise);
-  return (id: string) => {
-    const pr = deletePromise(id);
-    if (!pr) return;
-    toast("Compromiso eliminado", {
-      duration: UNDO_MS,
-      action: { label: "Deshacer", onClick: () => restorePromise(pr) },
     });
   };
 }

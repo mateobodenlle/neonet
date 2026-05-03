@@ -20,8 +20,6 @@ import {
   eventToRow,
   encounterToRow,
   interactionToRow,
-  painPointToRow,
-  promiseToRow,
   edgeToRow,
 } from "../lib/mappers";
 
@@ -44,7 +42,7 @@ const db = createClient(url, serviceRoleKey, {
 const day = (s: string) => s.slice(0, 10);
 
 async function isEmpty() {
-  const tables = ["people", "events", "encounters", "interactions", "pain_points", "promises", "edges"] as const;
+  const tables = ["people", "events", "encounters", "interactions", "edges"] as const;
   for (const t of tables) {
     const { count, error } = await db.from(t).select("*", { count: "exact", head: true });
     if (error) throw error;
@@ -55,7 +53,7 @@ async function isEmpty() {
 
 async function truncateAll() {
   // Order matters: children first.
-  for (const t of ["edges", "promises", "pain_points", "interactions", "encounters", "events", "people"] as const) {
+  for (const t of ["edges", "interactions", "encounters", "events", "people"] as const) {
     const { error } = await db.from(t).delete().neq("id", "");
     if (error) throw error;
   }
@@ -108,27 +106,6 @@ async function seed() {
   console.log(`Inserting ${interactionRows.length} interactions ...`);
   {
     const { error } = await db.from("interactions").insert(interactionRows);
-    if (error) throw error;
-  }
-
-  const painPointRows = mockDatabase.painPoints.map((p) => ({
-    ...painPointToRow(p),
-    created_at: new Date(p.createdAt).toISOString(),
-  }));
-  console.log(`Inserting ${painPointRows.length} pain points ...`);
-  {
-    const { error } = await db.from("pain_points").insert(painPointRows);
-    if (error) throw error;
-  }
-
-  const promiseRows = mockDatabase.promises.map((p) => ({
-    ...promiseToRow(p),
-    created_at: new Date(p.createdAt).toISOString(),
-    due_date: p.dueDate ? day(p.dueDate) : null,
-  }));
-  console.log(`Inserting ${promiseRows.length} promises ...`);
-  {
-    const { error } = await db.from("promises").insert(promiseRows);
     if (error) throw error;
   }
 
