@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useParams, notFound } from "next/navigation";
 import Link from "next/link";
 import { useDerived, useStore } from "@/lib/store";
-import { useDeleteContact, useDeleteEncounter, useDeleteInteraction, useDeletePainPoint, useArchivePerson } from "@/lib/actions";
+import { useDeleteContact, useDeleteEncounter, useDeleteInteraction, useArchivePerson } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,11 +20,10 @@ import { TagsEditor } from "@/components/tags-editor";
 import { ContactDialog } from "@/components/add-contact-dialog";
 import { EncounterDialog, AddEncounterDialog } from "@/components/add-encounter-dialog";
 import { InteractionDialog, AddInteractionDialog } from "@/components/add-interaction-dialog";
-import { PainPointDialog, AddPainPointDialog } from "@/components/add-painpoint-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDate, relativeDate } from "@/lib/utils";
-import { ArrowLeft, Building2, MapPin, Mail, Phone, Globe, Linkedin, Instagram, Twitter, MoreHorizontal, Pencil, Trash2, Archive, ArchiveRestore, StickyNote, TriangleAlert, Send } from "lucide-react";
-import type { Interaction, Encounter, PainPoint, Temperature, Category, InteractionKind } from "@/lib/types";
+import { ArrowLeft, Building2, MapPin, Mail, Phone, Globe, Linkedin, Instagram, Twitter, MoreHorizontal, Pencil, Trash2, Archive, ArchiveRestore, StickyNote, Send } from "lucide-react";
+import type { Interaction, Encounter, Temperature, Category, InteractionKind } from "@/lib/types";
 
 export default function ContactDetailPage() {
   const params = useParams<{ id: string }>();
@@ -35,12 +34,10 @@ export default function ContactDetailPage() {
   const archivePerson = useArchivePerson();
   const deleteEncounter = useDeleteEncounter();
   const deleteInteraction = useDeleteInteraction();
-  const deletePainPoint = useDeletePainPoint();
 
   const [editingContact, setEditingContact] = useState(false);
   const [editingEncounter, setEditingEncounter] = useState<Encounter | null>(null);
   const [editingInteraction, setEditingInteraction] = useState<Interaction | null>(null);
-  const [editingPainPoint, setEditingPainPoint] = useState<PainPoint | null>(null);
   const [quickNote, setQuickNote] = useState("");
   const [timelineFilter, setTimelineFilter] = useState<"all" | InteractionKind>("all");
 
@@ -49,7 +46,6 @@ export default function ContactDetailPage() {
 
   const encounters = d.getEncountersByPerson(person.id);
   const interactions = d.getInteractionsByPerson(person.id);
-  const painPoints = d.getPainPointsByPerson(person.id);
   const edges = d.getEdgesForPerson(person.id);
 
   const firstEncounter = encounters[encounters.length - 1];
@@ -280,35 +276,6 @@ export default function ContactDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Pain points */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pain points</CardTitle>
-              <AddPainPointDialog personId={person.id} />
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {painPoints.length === 0 && <p className="text-[13px] text-muted-foreground">Nada registrado.</p>}
-              {painPoints.map((pp) => {
-                const en = pp.sourceEncounterId ? d.getEncounter(pp.sourceEncounterId) : undefined;
-                return (
-                  <div key={pp.id} className="group flex items-start gap-3 rounded-md border border-border bg-secondary/30 px-3 py-2.5">
-                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[13px] leading-relaxed">{pp.description}</div>
-                      <div className="mt-1 flex flex-wrap gap-x-2 text-[11px] text-muted-foreground">
-                        <span>Captado el {formatDate(pp.createdAt)}</span>
-                        {en && <span>· en {en.location ?? formatDate(en.date)}</span>}
-                      </div>
-                    </div>
-                    <RowMenu
-                      onEdit={() => setEditingPainPoint(pp)}
-                      onDelete={() => deletePainPoint(pp.id)}
-                    />
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
         </div>
 
         <div className="space-y-6">
@@ -357,7 +324,6 @@ export default function ContactDetailPage() {
       <ContactDialog open={editingContact} onOpenChange={setEditingContact} initial={person} />
       <EncounterDialog open={!!editingEncounter} onOpenChange={(v) => !v && setEditingEncounter(null)} personId={person.id} initial={editingEncounter ?? undefined} />
       <InteractionDialog open={!!editingInteraction} onOpenChange={(v) => !v && setEditingInteraction(null)} personId={person.id} initial={editingInteraction ?? undefined} />
-      <PainPointDialog open={!!editingPainPoint} onOpenChange={(v) => !v && setEditingPainPoint(null)} personId={person.id} initial={editingPainPoint ?? undefined} />
     </div>
   );
 }
