@@ -14,7 +14,13 @@
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
 import { openai, EXTRACTION_MODEL } from "./openai";
-import { withLlmLogging, type LlmPurpose } from "./llm-observability";
+import { withLlmLoggingDetailed, type LlmPurpose } from "./llm-observability";
+import {
+  insertExtraction,
+  updateExtractionApplied,
+  insertCorrections,
+  diffPlan,
+} from "./eval-builder/persistence";
 import { supabaseAdmin } from "./supabase-admin";
 import { embedText, embedObservation } from "./embeddings";
 import {
@@ -152,7 +158,16 @@ interface RunOpts {
   metadata?: Record<string, unknown>;
 }
 
-async function runExtraction(opts: RunOpts): Promise<ExtractionV2> {
+interface RunExtractionResult {
+  extraction: ExtractionV2;
+  llmCallId: string;
+  durationMs: number;
+  promptTokens?: number;
+  cachedTokens?: number;
+  completionTokens?: number;
+}
+
+async function runExtraction(opts: RunOpts): Promise<RunExtractionResult> {
   type ChatBody = OpenAI.ChatCompletionCreateParamsNonStreaming & {
     prompt_cache_key?: string;
   };
@@ -166,7 +181,7 @@ async function runExtraction(opts: RunOpts): Promise<ExtractionV2> {
     ],
     prompt_cache_key: opts.cacheKey,
   };
-  return withLlmLogging(
+  const { result, trace } = await withLlmLoggingDetailed(
     {
       purpose: opts.purpose,
       model: EXTRACTION_MODEL,
@@ -177,12 +192,42 @@ async function runExtraction(opts: RunOpts): Promise<ExtractionV2> {
       const completion = await openai.chat.completions.create(body);
       const raw = completion.choices[0]?.message?.content;
       if (!raw) throw new Error("Empty response from OpenAI");
+      const parsed = JSON.parse(raw) as ExtractionV2;
+      const mentionsByText = new Map<string, { candidate_ids: string[]; proposed_new: unknown }>();
+      for (const o of parsed.observations ?? []) {
+        if (o.primary_mention) mentionsByText.set(o.primary_mention.text, o.primary_mention);
+        for (const p of o.participants ?? []) {
+          if (p.mention) mentionsByText.set(p.mention.text, p.mention);
+        }
+      }
+      for (const u of parsed.person_updates ?? []) {
+        if (u.primary_mention) mentionsByText.set(u.primary_mention.text, u.primary_mention);
+      }
+      const mentionList = [...mentionsByText.values()];
+      const ambiguous = mentionList.filter((m) => (m.candidate_ids?.length ?? 0) > 1).length;
+      const unresolved = mentionList.filter(
+        (m) => (m.candidate_ids?.length ?? 0) === 0 && !m.proposed_new,
+      ).length;
       return {
-        result: JSON.parse(raw) as ExtractionV2,
+        result: parsed,
         usage: completion.usage ?? undefined,
+        extraMetadata: {
+          observations_extracted: parsed.observations?.length ?? 0,
+          mentions_total: mentionList.length,
+          mentions_ambiguous: ambiguous,
+          mentions_unresolved: unresolved,
+        },
       };
     },
   );
+  return {
+    extraction: result,
+    llmCallId: trace.llmCallId,
+    durationMs: trace.durationMs,
+    promptTokens: trace.promptTokens,
+    cachedTokens: trace.cachedTokens,
+    completionTokens: trace.completionTokens,
+  };
 }
 
 function directoryCacheKey(directory: string): string {
@@ -194,10 +239,17 @@ function directoryCacheKey(directory: string): string {
   return `nl-v${2}-${(h >>> 0).toString(16)}`;
 }
 
+export interface ExtractionResultV2 {
+  extraction: ExtractionV2;
+  extractionId: string;
+}
+
+const PROMPT_VERSION_V2 = "v2";
+
 export async function extractFromNoteV2(
   text: string,
   today: string
-): Promise<ExtractionV2> {
+): Promise<ExtractionResultV2> {
   if (!text.trim()) throw new Error("Empty note");
   const me = await getMeProfileSummary();
   const directoryRows = await loadDirectory(me?.linkedPersonId ?? null);
@@ -210,7 +262,7 @@ export async function extractFromNoteV2(
     aboutYou
   );
   const userContent = `Hoy es ${today}.\n\n## Nota\n${text.trim()}`;
-  return runExtraction({
+  const run = await runExtraction({
     systemContent,
     userContent,
     cacheKey: directoryCacheKey(directory),
@@ -221,13 +273,32 @@ export async function extractFromNoteV2(
       context_observations: contextObs.length,
     },
   });
+  const extractionId = randomUUID();
+  await insertExtraction({
+    id: extractionId,
+    noteText: text,
+    noteContext: null,
+    todayDate: today,
+    promptVersion: PROMPT_VERSION_V2,
+    extractionType: "global",
+    subjectPersonId: null,
+    model: EXTRACTION_MODEL,
+    llmCallId: run.llmCallId,
+    rawExtraction: run.extraction,
+    directorySize: directoryRows.length,
+    durationMs: run.durationMs,
+    promptTokens: run.promptTokens ?? null,
+    cachedTokens: run.cachedTokens ?? null,
+    completionTokens: run.completionTokens ?? null,
+  });
+  return { extraction: run.extraction, extractionId };
 }
 
 export async function extractForPersonV2(
   text: string,
   personId: string,
   today: string
-): Promise<ExtractionV2> {
+): Promise<ExtractionResultV2> {
   if (!text.trim()) throw new Error("Empty note");
   const me = await getMeProfileSummary();
   const directoryRows = await loadDirectory(me?.linkedPersonId ?? null);
@@ -249,7 +320,7 @@ export async function extractForPersonV2(
     "## Nota",
     text.trim(),
   ].join("\n");
-  return runExtraction({
+  const run = await runExtraction({
     systemContent,
     userContent,
     cacheKey: directoryCacheKey(directory),
@@ -261,6 +332,25 @@ export async function extractForPersonV2(
       context_observations: contextObs.length,
     },
   });
+  const extractionId = randomUUID();
+  await insertExtraction({
+    id: extractionId,
+    noteText: text,
+    noteContext: `subject=${subject.full_name} (id=${subject.id})`,
+    todayDate: today,
+    promptVersion: PROMPT_VERSION_V2,
+    extractionType: "per-person",
+    subjectPersonId: personId,
+    model: EXTRACTION_MODEL,
+    llmCallId: run.llmCallId,
+    rawExtraction: run.extraction,
+    directorySize: directoryRows.length,
+    durationMs: run.durationMs,
+    promptTokens: run.promptTokens ?? null,
+    cachedTokens: run.cachedTokens ?? null,
+    completionTokens: run.completionTokens ?? null,
+  });
+  return { extraction: run.extraction, extractionId };
 }
 
 // ---------- apply ----------
@@ -288,6 +378,8 @@ function newPersonStub(suggested: ProposedNewPerson): Person {
 
 interface ApplyOpts {
   embedSync?: boolean; // default true
+  extractionId?: string;
+  rawExtraction?: ExtractionV2;
 }
 
 export interface ApplyResultV2 {
@@ -325,6 +417,27 @@ export async function applyPlanV2(
   opts: ApplyOpts = {}
 ): Promise<ApplyResultV2> {
   const embedSync = opts.embedSync ?? true;
+
+  // Best-effort: persist the diff between raw LLM output and the user-confirmed
+  // plan as correction rows. Never blocks the apply flow.
+  if (opts.extractionId && opts.rawExtraction) {
+    try {
+      const diffs = diffPlan(opts.rawExtraction, plan);
+      if (diffs.length > 0) {
+        await insertCorrections(
+          diffs.map((d) => ({
+            extractionId: opts.extractionId!,
+            correctionType: d.correctionType,
+            before: d.before,
+            after: d.after,
+          })),
+        );
+      }
+    } catch (e) {
+      console.error("applyPlanV2 diff persistence failed", e);
+    }
+  }
+
   const personIdByText = new Map<string, string>();
   const createdPeople: Person[] = [];
 
@@ -460,6 +573,17 @@ export async function applyPlanV2(
   if (dirtyPersonIds.size > 0) {
     await markPersonProfileDirty([...dirtyPersonIds]);
     await refreshPriorsForPersons([...dirtyPersonIds]);
+  }
+
+  if (opts.extractionId) {
+    const affectedPersons = Array.from(
+      new Set([
+        ...createdPeople.map((p) => p.id),
+        ...updatedPersonIds,
+        ...dirtyPersonIds,
+      ]),
+    );
+    await updateExtractionApplied(opts.extractionId, plan, affectedPersons, []);
   }
 
   return {
