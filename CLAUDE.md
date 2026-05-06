@@ -38,6 +38,12 @@ curl -X POST http://localhost:3000/api/jobs/synthesize \
   -H "x-job-secret: $JOB_SECRET" \
   -d '{"mode":"process-dirty","batchSize":5}'
 # Other modes: {"mode":"rebuild","personId":"..."}, {"mode":"refresh-priors"}
+
+# Cost analysis (read-only report over llm_calls)
+npx tsx scripts/cost-report.ts                          # 7-day default
+npx tsx scripts/cost-report.ts --days=30
+npx tsx scripts/cost-report.ts --days=1 --detailed
+npx tsx scripts/cost-report.ts --purpose=extraction --days=14
 ```
 
 There is no test runner (`jest`, `vitest`) — verification is through the eval scripts and `db:check`. Don't introduce one without asking.
