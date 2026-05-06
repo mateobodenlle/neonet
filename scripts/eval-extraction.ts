@@ -43,7 +43,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_EXTRACTION_MODEL ?? "gpt-4o-mini";
 const verbose = process.argv.includes("--verbose");
 
-interface FacetExpectation {
+interface FacetExpectationLegacy {
   type: string;
   [k: string]: unknown;
 }
@@ -55,15 +55,46 @@ interface ConfidenceExpectation {
   text_contains: string;
   confidence_in: Array<"high" | "medium" | "low">;
 }
+interface FacetExpectationV2 {
+  type: string;
+  filters?: Record<string, unknown>;
+  min_count: number;
+}
+interface InvariantsV2 {
+  observations_count: { min: number; max: number };
+  must_mention_persons: string[];
+  must_not_mention_persons: string[];
+  must_mention_organizations: string[];
+  must_have_facets: FacetExpectationV2[];
+  warnings_count: { min: number; max: number };
+}
 interface Case {
+  // shared
+  id?: string;
+  source_extraction_id?: string;
   note: string;
+  note_context?: string | null;
+  tags?: string[];
+  priority?: number;
+  notes?: string | null;
+  // legacy and v2 expectations are both supported on `expected`
   expected: {
+    // legacy fields
     observations_count_min?: number;
     must_mention_persons?: string[];
-    must_have_facets?: FacetExpectation[];
+    must_have_facets?: FacetExpectationLegacy[];
     must_have_person_updates?: PersonUpdateExpectation[];
     must_have_mentions_with_confidence?: ConfidenceExpectation[];
+    // v2 fields
+    observations_count?: { min: number; max: number };
+    must_not_mention_persons?: string[];
+    must_mention_organizations?: string[];
+    warnings_count?: { min: number; max: number };
   };
+}
+
+function isV2(c: Case): boolean {
+  return typeof c.expected.observations_count === "object" && c.expected.observations_count !== null;
 }
 
 function readCases(): Case[] {
@@ -123,13 +154,92 @@ async function runOne(c: Case): Promise<ExtractionV2> {
   return JSON.parse(raw) as ExtractionV2;
 }
 
+interface InvariantResult {
+  invariant: string;
+  passed: boolean;
+  actual?: unknown;
+  expected?: unknown;
+}
 interface CaseResult {
+  caseId?: string;
   note: string;
   pass: boolean;
   failures: string[];
+  invariantResults: InvariantResult[];
+}
+
+function scoreV2(c: Case, ex: ExtractionV2): CaseResult {
+  const exp = c.expected as InvariantsV2 & Case["expected"];
+  const fails: string[] = [];
+  const results: InvariantResult[] = [];
+
+  // observations_count
+  const obsCount = ex.observations.length;
+  const obsExpected = exp.observations_count!;
+  const obsPassed = obsCount >= obsExpected.min && obsCount <= obsExpected.max;
+  results.push({ invariant: "observations_count", passed: obsPassed, actual: obsCount, expected: obsExpected });
+  if (!obsPassed) fails.push(`observations: got ${obsCount}, expected [${obsExpected.min}, ${obsExpected.max}]`);
+
+  // mentions persons (substring match against names — but for v2 we treat ids as id strings; mention.text contains a name)
+  const allMentionTexts = new Set<string>();
+  for (const o of ex.observations) {
+    allMentionTexts.add(o.primary_mention.text.toLowerCase());
+    for (const p of o.participants) allMentionTexts.add(p.mention.text.toLowerCase());
+  }
+  for (const u of ex.person_updates) allMentionTexts.add(u.primary_mention.text.toLowerCase());
+  // collect mention candidate ids
+  const allCandidateIds = new Set<string>();
+  for (const o of ex.observations) {
+    for (const id of o.primary_mention.candidate_ids ?? []) allCandidateIds.add(id);
+    for (const p of o.participants) for (const id of p.mention.candidate_ids ?? []) allCandidateIds.add(id);
+  }
+  for (const u of ex.person_updates) for (const id of u.primary_mention.candidate_ids ?? []) allCandidateIds.add(id);
+
+  const missingMust = (exp.must_mention_persons ?? []).filter((id) => !allCandidateIds.has(id));
+  const must = missingMust.length === 0;
+  results.push({ invariant: "must_mention_persons", passed: must, actual: [...allCandidateIds], expected: exp.must_mention_persons });
+  if (!must) fails.push(`missing mentions of person ids: ${missingMust.join(", ")}`);
+
+  const violatingNot = (exp.must_not_mention_persons ?? []).filter((id) => allCandidateIds.has(id));
+  const notOk = violatingNot.length === 0;
+  results.push({ invariant: "must_not_mention_persons", passed: notOk, actual: violatingNot, expected: exp.must_not_mention_persons });
+  if (!notOk) fails.push(`forbidden person ids appeared: ${violatingNot.join(", ")}`);
+
+  // facets
+  for (const f of exp.must_have_facets ?? []) {
+    let count = 0;
+    for (const o of ex.observations) {
+      try {
+        const facets = JSON.parse(o.facets.raw || "{}") as Record<string, unknown>;
+        if (facets.type !== f.type) continue;
+        if (f.filters) {
+          let ok = true;
+          for (const [k, v] of Object.entries(f.filters)) {
+            if (facets[k] !== v) { ok = false; break; }
+          }
+          if (!ok) continue;
+        }
+        count++;
+      } catch {}
+    }
+    const passed = count >= f.min_count;
+    results.push({ invariant: `facet:${f.type}`, passed, actual: count, expected: f });
+    if (!passed) fails.push(`facet ${JSON.stringify(f)}: got ${count}, expected ≥ ${f.min_count}`);
+  }
+
+  // warnings
+  const warnCount = ex.warnings.length;
+  const warnExpected = exp.warnings_count!;
+  const warnPassed = warnCount >= warnExpected.min && warnCount <= warnExpected.max;
+  results.push({ invariant: "warnings_count", passed: warnPassed, actual: warnCount, expected: warnExpected });
+  if (!warnPassed) fails.push(`warnings: got ${warnCount}, expected [${warnExpected.min}, ${warnExpected.max}]`);
+
+  return { caseId: c.id, note: c.note, pass: fails.length === 0, failures: fails, invariantResults: results };
 }
 
 function score(c: Case, ex: ExtractionV2): CaseResult {
+  if (isV2(c)) return scoreV2(c, ex);
+  // legacy path
   const fails: string[] = [];
   if (
     c.expected.observations_count_min !== undefined &&
@@ -200,7 +310,28 @@ function score(c: Case, ex: ExtractionV2): CaseResult {
     });
     if (!matched) fails.push(`no person_update matching ${JSON.stringify(u)}`);
   }
-  return { note: c.note, pass: fails.length === 0, failures: fails };
+  return { caseId: c.id, note: c.note, pass: fails.length === 0, failures: fails, invariantResults: [] };
+}
+
+async function appendEvalRun(c: Case, r: CaseResult, durationMs: number): Promise<void> {
+  if (!c.id) return;
+  try {
+    // Read current eval_runs, append, write back. Simple, atomic-enough for single-user.
+    const { data, error } = await supa.from("eval_cases").select("eval_runs").eq("id", c.id).maybeSingle();
+    if (error || !data) return;
+    const runs = (data.eval_runs as Array<Record<string, unknown>>) ?? [];
+    runs.push({
+      run_at: new Date().toISOString(),
+      prompt_version: "v2",
+      model: MODEL,
+      passed: r.pass,
+      invariant_results: r.invariantResults,
+      duration_ms: durationMs,
+    });
+    await supa.from("eval_cases").update({ eval_runs: runs }).eq("id", c.id);
+  } catch (e) {
+    console.warn("appendEvalRun failed", e);
+  }
 }
 
 async function main() {
@@ -208,9 +339,12 @@ async function main() {
   console.log(`Running ${cases.length} cases against ${MODEL}…\n`);
   const results: CaseResult[] = [];
   for (const c of cases) {
+    const start = Date.now();
     const ex = await runOne(c);
+    const durationMs = Date.now() - start;
     const r = score(c, ex);
     results.push(r);
+    await appendEvalRun(c, r, durationMs);
     const mark = r.pass ? "✓" : "✗";
     console.log(`${mark} ${c.note.slice(0, 70)}…`);
     if (!r.pass) {

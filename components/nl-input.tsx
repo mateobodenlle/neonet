@@ -21,6 +21,7 @@ type Phase =
   | {
       kind: "preview";
       extraction: ExtractionV2;
+      extractionId: string;
       resolutions: Record<string, MentionResolution>;
       supersedes: Record<number, string[]>;
     }
@@ -73,13 +74,13 @@ export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Prop
     setPhase({ kind: "extracting" });
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const extraction = subjectPersonId
+      const { extraction, extractionId } = subjectPersonId
         ? await extractForPersonV2(text, subjectPersonId, today)
         : await extractFromNoteV2(text, today);
       const mentions = collectMentionsLocal(extraction);
       const resolutions: Record<string, MentionResolution> = {};
       for (const m of mentions) resolutions[m.text] = defaultResolution(m);
-      setPhase({ kind: "preview", extraction, resolutions, supersedes: {} });
+      setPhase({ kind: "preview", extraction, extractionId, resolutions, supersedes: {} });
     } catch (err) {
       console.error(err);
       toast.error("Error extrayendo entidades", {
@@ -101,7 +102,10 @@ export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Prop
     };
     setPhase({ kind: "applying" });
     try {
-      const result = await applyPlanV2(plan);
+      const result = await applyPlanV2(plan, {
+        extractionId: phase.extractionId,
+        rawExtraction: phase.extraction,
+      });
       await hydrate();
       const parts = [
         result.createdPeople.length && `${result.createdPeople.length} contactos`,

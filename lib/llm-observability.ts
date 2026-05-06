@@ -11,6 +11,7 @@ import "server-only";
  * null cost rather than a wrong number.
  */
 
+import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "./supabase-admin";
 import { PRICING_TABLE } from "./openai-pricing";
 
@@ -26,6 +27,7 @@ export type LlmPurpose =
   | "other";
 
 export interface LogInput {
+  id?: string;
   purpose: LlmPurpose;
   model: string;
   promptTokens?: number;
@@ -75,6 +77,7 @@ export async function logLlmCall(input: LogInput): Promise<void> {
       input.completionTokens,
     );
     const { error } = await supabaseAdmin.from("llm_calls").insert({
+      ...(input.id ? { id: input.id } : {}),
       purpose: input.purpose,
       model: input.model,
       prompt_tokens: input.promptTokens ?? null,
@@ -94,32 +97,69 @@ export async function logLlmCall(input: LogInput): Promise<void> {
   }
 }
 
-type WrapperBase = Omit<LogInput, "durationMs" | "success" | "errorMessage" |
+type WrapperBase = Omit<LogInput, "id" | "durationMs" | "success" | "errorMessage" |
   "promptTokens" | "cachedTokens" | "completionTokens">;
+
+export interface LlmLogTrace {
+  llmCallId: string;
+  durationMs: number;
+  promptTokens?: number;
+  cachedTokens?: number;
+  completionTokens?: number;
+  success: boolean;
+  errorMessage?: string;
+}
 
 export async function withLlmLogging<T>(
   base: WrapperBase,
-  fn: () => Promise<{ result: T; usage?: OpenAIUsageLike }>,
+  fn: () => Promise<{ result: T; usage?: OpenAIUsageLike; extraMetadata?: Record<string, unknown> }>,
 ): Promise<T> {
+  const r = await withLlmLoggingDetailed(base, fn);
+  return r.result;
+}
+
+export async function withLlmLoggingDetailed<T>(
+  base: WrapperBase,
+  fn: () => Promise<{ result: T; usage?: OpenAIUsageLike; extraMetadata?: Record<string, unknown> }>,
+): Promise<{ result: T; trace: LlmLogTrace }> {
+  const llmCallId = randomUUID();
   const start = Date.now();
   try {
-    const { result, usage } = await fn();
-    // Fire-and-forget: don't add latency to the caller path.
+    const { result, usage, extraMetadata } = await fn();
+    const durationMs = Date.now() - start;
+    const promptTokens = usage?.prompt_tokens;
+    const cachedTokens = usage?.prompt_tokens_details?.cached_tokens;
+    const completionTokens = usage?.completion_tokens;
     void logLlmCall({
       ...base,
-      durationMs: Date.now() - start,
+      id: llmCallId,
+      metadata: extraMetadata ? { ...(base.metadata ?? {}), ...extraMetadata } : base.metadata,
+      durationMs,
       success: true,
-      promptTokens: usage?.prompt_tokens,
-      cachedTokens: usage?.prompt_tokens_details?.cached_tokens,
-      completionTokens: usage?.completion_tokens,
+      promptTokens,
+      cachedTokens,
+      completionTokens,
     });
-    return result;
+    return {
+      result,
+      trace: {
+        llmCallId,
+        durationMs,
+        promptTokens,
+        cachedTokens,
+        completionTokens,
+        success: true,
+      },
+    };
   } catch (e) {
+    const durationMs = Date.now() - start;
+    const errorMessage = e instanceof Error ? e.message : String(e);
     void logLlmCall({
       ...base,
-      durationMs: Date.now() - start,
+      id: llmCallId,
+      durationMs,
       success: false,
-      errorMessage: e instanceof Error ? e.message : String(e),
+      errorMessage,
     });
     throw e;
   }
