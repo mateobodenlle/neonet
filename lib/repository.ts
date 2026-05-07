@@ -16,6 +16,7 @@ import type {
   ObservationParticipant,
   PersonProfile,
 } from "./types";
+import type { NlExtractionRow } from "./eval-builder/types";
 
 /**
  * Legacy in-memory repository contract — preserved so older code paths still
@@ -152,4 +153,47 @@ export async function getDirtyProfiles(opts: {
     .limit(opts.limit);
   if (error) throw error;
   return (data ?? []).map(personProfileFromRow);
+}
+
+// nl_extractions queries — buffer móvil ---------------------------------
+
+export async function getPendingExtractions(
+  opts: { limit?: number } = {}
+): Promise<NlExtractionRow[]> {
+  const { limit = 50 } = opts;
+  const { data, error } = await supabaseAdmin
+    .from("nl_extractions")
+    .select("*")
+    .is("applied_plan", null)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as NlExtractionRow[];
+}
+
+export async function getExtractionById(
+  id: string
+): Promise<NlExtractionRow | null> {
+  const { data, error } = await supabaseAdmin
+    .from("nl_extractions")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as NlExtractionRow | null) ?? null;
+}
+
+// Marca una extracción como descartada explícitamente (vs. simplemente
+// pendiente). El marcador queda en applied_plan = {discarded:true} y
+// applied_at se rellena. Distingue "el usuario decidió no aplicar" de
+// "todavía está en el buffer".
+export async function markExtractionAsDiscarded(id: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("nl_extractions")
+    .update({
+      applied_plan: { discarded: true } as unknown as never,
+      applied_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) throw error;
 }

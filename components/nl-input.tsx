@@ -11,8 +11,8 @@ import type {
   ExtractionV2,
   ConfirmedPlanV2,
   MentionResolution,
-  PersonMention,
 } from "@/lib/nl-types";
+import { collectMentions, defaultResolution } from "@/lib/extraction-plan";
 import { NLPreviewV2 } from "./nl-preview-v2";
 
 type Phase =
@@ -41,29 +41,6 @@ interface Props {
   subjectPersonId?: string;
 }
 
-function collectMentionsLocal(extraction: ExtractionV2): PersonMention[] {
-  const byText = new Map<string, PersonMention>();
-  const add = (m: PersonMention) => {
-    if (!byText.has(m.text)) byText.set(m.text, m);
-  };
-  for (const o of extraction.observations) {
-    add(o.primary_mention);
-    for (const p of o.participants) add(p.mention);
-  }
-  for (const u of extraction.person_updates) add(u.primary_mention);
-  return [...byText.values()];
-}
-
-function defaultResolution(m: PersonMention): MentionResolution {
-  // confidence='high' → trust the LLM's first pick
-  // confidence='medium' → still pre-pick the top candidate, user can override
-  // confidence='low' → pre-pick top, but the UI surfaces the picker so user reviews
-  if (m.candidate_ids.length > 0)
-    return { kind: "existing", personId: m.candidate_ids[0] };
-  if (m.proposed_new) return { kind: "new", person: m.proposed_new };
-  return { kind: "skip" };
-}
-
 export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Props) {
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -77,7 +54,7 @@ export function NLInput({ onClose, placeholder, compact, subjectPersonId }: Prop
       const { extraction, extractionId } = subjectPersonId
         ? await extractForPersonV2(text, subjectPersonId, today)
         : await extractFromNoteV2(text, today);
-      const mentions = collectMentionsLocal(extraction);
+      const mentions = collectMentions(extraction);
       const resolutions: Record<string, MentionResolution> = {};
       for (const m of mentions) resolutions[m.text] = defaultResolution(m);
       setPhase({ kind: "preview", extraction, extractionId, resolutions, supersedes: {} });
