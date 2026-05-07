@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Home, Users, CalendarDays, Share2, Search, User } from "lucide-react";
+import { LogoutButton } from "@/components/logout-button";
 
 const nav = [
   { href: "/", label: "Inicio", icon: Home },
@@ -53,8 +54,9 @@ export function AppSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-border px-5 py-4 text-xs text-muted-foreground">
-        osixtechteam@gmail.com
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border px-5 py-4 text-xs text-muted-foreground">
+        <span className="truncate">osixtechteam@gmail.com</span>
+        <LogoutButton />
       </div>
     </aside>
   );
