@@ -24,6 +24,7 @@ export type LlmPurpose =
   | "embedding-profile"
   | "embedding-query"
   | "rerank"
+  | "transcription"
   | "other";
 
 export interface LogInput {
