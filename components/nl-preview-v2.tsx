@@ -19,12 +19,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useStore } from "@/lib/store";
 import { formatDate } from "@/lib/utils";
+import { collectMentions, parseFacets } from "@/lib/extraction-plan";
 import type { Person } from "@/lib/types";
 import type {
   ExtractionV2,
   ExtractedObservationV2,
   MentionResolution,
-  PersonMention,
 } from "@/lib/nl-types";
 
 interface Props {
@@ -37,19 +37,6 @@ interface Props {
   onApply: () => void;
   onDiscard: () => void;
   applying: boolean;
-}
-
-function collectMentions(extraction: ExtractionV2): PersonMention[] {
-  const byText = new Map<string, PersonMention>();
-  const add = (m: PersonMention) => {
-    if (!byText.has(m.text)) byText.set(m.text, m);
-  };
-  for (const o of extraction.observations) {
-    add(o.primary_mention);
-    for (const p of o.participants) add(p.mention);
-  }
-  for (const u of extraction.person_updates) add(u.primary_mention);
-  return [...byText.values()];
 }
 
 export function NLPreviewV2({
@@ -361,15 +348,6 @@ function ConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low"
       {label}
     </span>
   );
-}
-
-function parseFacets(raw: string): Record<string, unknown> {
-  try {
-    const v = JSON.parse(raw || "{}");
-    return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
 }
 
 function Section({
