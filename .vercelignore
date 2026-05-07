@@ -1,0 +1,29 @@
+# Datos y assets de desarrollo no necesarios en producción
+data/
+docs/
+
+# Scripts y migraciones se ejecutan localmente con npm run db:migrate
+scripts/
+supabase/
+
+# Notas y planes
+*.md
+!README.md
+
+# Local env files (Vercel inyecta los suyos)
+.env
+.env.local
+.env.*.local
+
+# Build artifacts y caches
+.next/
+node_modules/
+.vercel/
+
+# Editor
+.vscode/
+.idea/
+
+# Misc
+*.log
+.DS_Store

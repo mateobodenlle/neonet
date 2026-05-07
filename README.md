@@ -45,20 +45,24 @@ Web primero, luego app móvil sincronizadas. Pensado desde el principio para que
 
 La ingesta inicial viene del export de LinkedIn y los contactos del móvil — acepto que la primera sesión sea dura. A partir de ahí crece orgánicamente con el uso diario.
 
-La inteligencia (entrada natural, desambiguación de entidades, consultas semánticas) se apoya en Claude. El resto es Postgres + sincronización trivial.
+La inteligencia (entrada natural, desambiguación de entidades, consultas semánticas) se apoya en un LLM (OpenAI). El resto es Postgres + sincronización trivial.
 
 ## Estado actual
 
-Versión web funcional con el CRM básico: contactos con ficha rica y editable, eventos con la gente conocida en ellos, grafo de conexiones, pendientes con undo, pain points, timeline unificado, búsqueda global con Cmd-K, archive de contactos, etc.
+Versión web + móvil funcional, sobre Supabase de prod, con auth simple por contraseña global:
 
-Lo que queda para que sea "mi herramienta" de verdad:
+- Persistencia real en Postgres + pgvector (RLS server-only via service role).
+- Importer LinkedIn (contactos, invitaciones, contenido) y vCard.
+- Input en lenguaje natural sobre observaciones — el feature que justifica el proyecto. Extracción → preview → apply, con persistencia de cada extracción para revisión posterior.
+- Síntesis de perfil por persona, batch + on-demand.
+- Grafo, eventos, ficha rica, búsqueda Cmd-K, archive, merge manual, multi-select.
+- Rutas móviles `/m/*` con captura por voz (Whisper + fallback Web Speech), buffer de notas pendientes y revisión vertical pensada para una mano.
 
-- Persistencia real (hoy vive en el navegador).
-- Importer de LinkedIn y contactos del móvil para la carga inicial.
-- Input en lenguaje natural con Claude — el feature que justifica el proyecto.
-- App móvil Android con voice-first.
+Polish y siguientes:
 
-Lo demás es polish.
+- Bajar el coste de la llamada de extracción (hoy manda directorio entero — ver `PROJECT.md`).
+- Síntesis automática programada (hoy se dispara manualmente).
+- iOS Safari: el voice path está implementado pero no probado en producción.
 
 ---
 
@@ -72,11 +76,21 @@ npm run db:seed                   # carga el dataset mock (idempotente; usa --fo
 npm run dev
 ```
 
-`.env.local` requiere:
+`.env.local` requiere (ver `.env.example` para el set completo):
 
 - `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` — públicas, las usa el navegador.
 - `SUPABASE_SERVICE_ROLE_KEY` — server-only, bypass de RLS (scripts y server actions).
 - `SUPABASE_DB_URL` — connection string Postgres directa, sólo para `db:migrate`.
+- `OPENAI_API_KEY` — extracción NL, síntesis, embeddings, transcripción Whisper.
+- `JOB_SECRET` — protege `/api/jobs/*` (curl manuales, scripts).
+- `APP_PASSWORD` y `JWT_SECRET` — auth global por contraseña + cookie firmada con jose.
+  Generar `JWT_SECRET` con `openssl rand -hex 32`.
+
+## Deployment
+
+`DEPLOYMENT.md` cubre el despliegue a Vercel (Hobby): pre-requisitos, variables
+de entorno, pasos de primer deploy, checklist post-deploy, troubleshooting y
+válvula de bypass de auth para emergencias.
 
 ## Convenciones
 
