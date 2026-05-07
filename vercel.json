@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["cdg1"],
+  "functions": {
+    "app/api/transcribe/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/jobs/synthesize/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}

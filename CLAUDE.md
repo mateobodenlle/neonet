@@ -97,6 +97,26 @@ Synthesis does not run inline on writes — it is decoupled and idempotent. UI r
 
 `lib/types.ts` is the canonical domain. `lib/types-db.ts` mirrors raw Supabase rows. `lib/mappers.ts` converts between them (including `vectorToWire` for the pgvector text representation). `Closeness` is **atemporal** (personal warmth) and distinct from `Temperature` (commercial heat that moves with current activity) — do not conflate them.
 
+### Auth and routing
+
+A single global password gates everything. `middleware.ts` (edge runtime) verifies a `neonet-auth` cookie signed with `jose` (HS256, 30-day expiry). `lib/auth.ts` exposes `signToken` / `verifyToken` and is edge-safe — do not import `node:*` from it. `/api/auth/login` runs on edge and uses a manual constant-time string compare (no `node:crypto`). The middleware also passes `x-pathname` as a response header on every authenticated `next()` so the root layout can decide whether to render the desktop shell.
+
+Two valves: `BYPASS_AUTH=true` env var skips the gate entirely (emergency only); the `x-job-secret` header preserves curl access to `/api/jobs/*` and `/api/dev/*` after auth was added.
+
+### Mobile routes (`/m/*`)
+
+The mobile flow lives under `app/m/*` and is intentionally separate from the desktop:
+
+- `app/layout.tsx` reads `x-pathname` from middleware and skips the desktop sidebar / `CommandPalette` / `NLInputDialog` / `HydrationGate` when the path is `/m/*` or `/login`. Those four are loaded via `next/dynamic` so the layout chunk doesn't carry them either.
+- `app/m/layout.tsx` renders `MobileHeader` with a pending-count badge and logout. The badge is computed server-side via `getPendingCount()`; `router.refresh()` after every mutation keeps it fresh.
+- The capture flow is fire-and-forget: textarea clears immediately, server action runs in background, sonner toast carries the user through `loading → success/error` with a "Ver" action that navigates to `/m/pending`. Failed notes are kept in `localStorage["neonet-pending-note-backup"]`.
+- `lib/mobile-actions.ts` (`"use server"`) is the only server-action surface for mobile. `lib/mobile-types.ts` holds shared types (`use server` files cannot export non-async values). `lib/extraction-plan.ts` holds pure helpers (`collectMentions`, `defaultResolution`, `parseFacets`, `collectCandidateIds`) shared between desktop preview and mobile review — extracted from `nl-input.tsx`/`nl-preview-v2.tsx` to dedupe.
+- `nl_extractions.applied_plan` discriminates three states: `null` (pending), `{discarded:true}` (explicitly discarded), or a `ConfirmedPlanV2` shape (applied). `markExtractionAsDiscarded` writes the discarded marker; `getPendingExtractions` filters to `applied_plan IS NULL`. The legacy eval-builder `listExtractions` filter still treats `applied_at IS NULL` as "discarded" — that nomenclature is stale post-mobile but it's a side-tool, untouched.
+
+### Voice input
+
+`components/shared/voice-input.tsx` is reusable on both desktop (`/dev/voice-test`) and mobile (`/m`). It records via `MediaRecorder` (webm/opus preferred), uploads to `/api/transcribe` (Whisper, `nodejs` runtime, 25 MB hard limit), and offers a Web Speech API fallback button on failure. Hard-stop at 30 seconds protects against the 10s Vercel Hobby timeout on transcribe.
+
 ## Conventions you must follow
 
 `CONTRIBUTING.md` is binding. Two rules in particular have caused trouble before:
