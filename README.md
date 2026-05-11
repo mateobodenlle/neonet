@@ -58,6 +58,8 @@ Versión web + móvil funcional, sobre Supabase de prod, con auth simple por con
 - Grafo, eventos, ficha rica, búsqueda Cmd-K, archive, merge manual, multi-select.
 - Rutas móviles `/m/*` con captura por voz (Whisper + fallback Web Speech), buffer de notas pendientes y revisión vertical pensada para una mano.
 
+Además, hay una **demo pública sin login** (`/demo`) con datos ficticios para que cualquiera pueda probar el flujo sin tocar mi CRM real — más detalle abajo.
+
 Polish y siguientes:
 
 - Bajar el coste de la llamada de extracción (hoy manda directorio entero — ver `PROJECT.md`).
@@ -85,6 +87,16 @@ npm run dev
 - `JOB_SECRET` — protege `/api/jobs/*` (curl manuales, scripts).
 - `APP_PASSWORD` y `JWT_SECRET` — auth global por contraseña + cookie firmada con jose.
   Generar `JWT_SECRET` con `openssl rand -hex 32`.
+
+## Modo demo público
+
+`/demo` es una variante completamente aislada del CRM real, accesible desde el botón "Probar demo" en `/login` (sin contraseña).
+
+- **Datos ficticios en memoria:** 12 contactos representativos, observaciones, eventos, encuentros, edges y narrativas. Se cargan frescos cada sesión y se evaporan a los 30 min (o en cualquier redeploy / cold start).
+- **Extracción real con OpenAI:** la nota natural se envía al mismo prompt que el CRM real, pero con el directorio de la demo. Con rate limit por IP: 30 extracciones/día, 5/min (transcripción: 15/día, 3/min).
+- **El botón "Aplicar" no escribe nada en la base de datos** — las mutaciones quedan en el store en memoria de la sesión.
+- **Aislamiento por construcción:** cookie distinta (`neonet-demo` vs `neonet-auth`), middleware que rechaza cookies cruzadas, regla ESLint `no-restricted-imports` que prohíbe a `lib/demo/**` / `app/demo/**` importar nada que toque Supabase o las server actions reales. Ver detalle en `CLAUDE.md` → "Public demo".
+- **Rutas:** `/demo` (escritorio: home, contactos, grafo), `/demo/m` (móvil: captura, pendientes, revisión). La sidebar desktop tiene Cmd+Shift+J para abrir el extractor.
 
 ## Deployment
 
