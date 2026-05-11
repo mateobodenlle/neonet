@@ -146,9 +146,20 @@ npm run dev
 - `npm run import:linkedin` — importa export de LinkedIn (`data/linkedin/`).
 - `npm run import:linkedin-invitations` — importa pendientes/aceptadas de invitaciones.
 
+## Demo pública (`/demo`)
+
+Variante completamente aislada del CRM real, accesible sin contraseña desde el botón "Probar demo" en `/login`. Pensada para que cualquiera pueda probar el flujo de extracción NL sin tocar mis datos.
+
+- **Cookie aparte** (`neonet-demo`, JWT subject `"demo"`, 6 h). El middleware nunca mezcla autenticaciones: una cookie demo no abre rutas reales, y viceversa.
+- **Árbol de rutas separado** `app/demo/*` (escritorio: home, contactos, grafo) y `app/demo/m/*` (móvil reusando `MobileCapture` / `ExtractionReview` / `PendingList` con acciones inyectadas por prop). Endpoints en `app/api/demo/{start,exit,transcribe}`.
+- **Store in-memory por sesión** (`lib/demo/store.ts`): 12 contactos, 5 eventos, 12 encuentros, 20 observaciones, 9 edges, 11 narrativas, 1 extracción pre-cargada. TTL 30 min; cold start / redeploy lo evapora.
+- **Extracción y transcripción reales** contra OpenAI con rate limit por IP (`lib/demo/rate-limit.ts`): 30 extracciones/día + 5/min, 15 transcripciones/día + 3/min.
+- **Aplicar no escribe en Supabase** — todas las mutaciones (`applyExtractionDemo`, creación de personas desde `proposed_new`, supersedes) viven en el `Map` de la sesión.
+- **Aislamiento por construcción**: `.eslintrc.json` con `no-restricted-imports` impide a `lib/demo/**`, `app/demo/**`, `app/api/demo/**` y `components/demo/**` importar nada de Supabase, server-actions, repository, mobile-actions, profile-synthesis, embeddings, person-prior o eval-builder. Vercel ejecuta `npm run lint` en build; un import prohibido rompe el deploy. Más detalle en `CLAUDE.md` → "Public demo (`/demo/*`)".
+
 ## Estado actual
 
-**Funcional**: contactos con ficha editable, eventos con asistentes, grafo de conexiones, pendientes con undo, pain points, timeline unificado, command palette, archive, NL input global y por-persona, multi-persona promises, closeness atemporal, persistencia real en Supabase, importers LinkedIn + vCard.
+**Funcional**: contactos con ficha editable, eventos con asistentes, grafo de conexiones, pendientes con undo, pain points, timeline unificado, command palette, archive, NL input global y por-persona, multi-persona promises, closeness atemporal, persistencia real en Supabase, importers LinkedIn + vCard, móvil `/m` con voz, **demo pública `/demo` (desktop + móvil) con datos ficticios aislada del CRM real**.
 
 **Pendiente** (en orden aproximado de prioridad):
 - Optimización de coste del NL extraction (cache + tools + densificación).

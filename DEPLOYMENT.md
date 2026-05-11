@@ -106,6 +106,45 @@ Tras cada deploy a producción, ejecutar:
 - [ ] Logout (icono en header / sidebar) cierra la sesión y redirige
       a `/login`.
 
+### Demo pública (`/demo`)
+
+La demo no añade variables de entorno propias — usa las mismas
+(`JWT_SECRET` para firmar la cookie demo, `OPENAI_API_KEY` para la
+extracción y transcripción). Checklist específico:
+
+- [ ] `/login` muestra el botón "Probar demo".
+- [ ] Al pulsarlo, redirige a `/demo` y aparece el banner ámbar
+      "Modo demo".
+- [ ] Sidebar con Inicio, Contactos, Grafo y Móvil.
+- [ ] `/demo/contacts` lista 12 personas; el detalle de cada una
+      muestra observaciones + síntesis.
+- [ ] `/demo/graph` renderiza el grafo con 9 edges.
+- [ ] `Cmd+Shift+J` abre el extractor; procesar una nota muestra el
+      toast con acción "Revisar" → lleva a `/demo/m/pending/[id]`.
+- [ ] Aplicar la nota NO impacta la base real (verificable en
+      Supabase: `select count(*) from nl_extractions` antes/después
+      no cambia).
+- [ ] Una segunda pestaña con la cookie del CRM real sigue
+      funcionando sin interferencias.
+- [ ] Borrar la cookie `neonet-demo` y entrar a `/demo` redirige
+      a `/login`.
+
+Rate limits actuales (in-memory por IP, en `lib/demo/rate-limit.ts`,
+se reinician en cualquier cold start / redeploy):
+
+- Extracción NL: 30/día, 5/min.
+- Transcripción Whisper: 15/día, 3/min.
+
+Si quieres ajustarlos sin redeploy, cambia las constantes y vuelve a
+desplegar. Para algo más resistente entre cold starts, mover los dos
+mapas a Upstash Redis manteniendo la API de `consume()` /
+`consumeTranscribe()`.
+
+El store de la demo (`lib/demo/store.ts`) vive en memoria del
+proceso. En Vercel, si un usuario salta entre instancias verá
+estados distintos. Aceptable para una demo de una sentada; si
+empieza a molestar, mismo plan: Upstash detrás del mismo interface.
+
 ## 5. Troubleshooting
 
 ### "Timeout en /api/transcribe"

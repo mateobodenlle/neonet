@@ -107,7 +107,30 @@ multiple candidates score above threshold.
 - Merge a `main` mediante **squash-merge**; el commit final hereda el título de la PR.
 - No hace falta CHANGELOG manual: el log de `main` ya está estructurado.
 
-## 6. Reglas de seguridad git
+## 6. Aislamiento de la demo
+
+`lib/demo/**`, `app/demo/**`, `app/api/demo/**` y `components/demo/**`
+viven aislados del CRM real **por construcción**, no por revisión.
+
+**Prohibido importar desde esos paths** cualquier módulo que toque
+Supabase o el CRM real. El `no-restricted-imports` de `.eslintrc.json`
+lo bloquea; si te lo saltas, se filtran datos reales en la demo
+pública. Concretamente:
+
+- `lib/supabase`, `lib/supabase-admin`
+- `lib/server-actions`, `lib/repository`, `lib/mobile-actions`
+- `lib/nl-actions`, `lib/nl-actions-v2`
+- `lib/observations-actions`, `lib/me-profile-actions`,
+  `lib/promise-actions`, `lib/candidate-actions`,
+  `lib/linkedin-insight-actions`
+- `lib/profile-synthesis`, `lib/embeddings`, `lib/person-prior`
+- `lib/eval-builder/*`
+
+Si necesitas algo de ahí, repórtelo en el código demo (idealmente
+copia las funciones puras) o cuestiona si realmente hace falta. El
+build de Vercel ejecuta `npm run lint` y romperá si la regla salta.
+
+## 7. Reglas de seguridad git
 
 - No se commitean secretos (`.env*`, tokens, claves) — protegidos por `.gitignore`.
 - Nunca `--no-verify` ni se saltan hooks.
