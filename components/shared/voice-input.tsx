@@ -34,6 +34,8 @@ export interface VoiceInputProps {
   language?: string;
   disabled?: boolean;
   className?: string;
+  /** Endpoint de transcripción. Default: /api/transcribe (CRM real). */
+  transcribeUrl?: string;
 }
 
 type State =
@@ -64,7 +66,13 @@ function pickMimeType(): string | undefined {
   return undefined;
 }
 
-export function VoiceInput({ onTranscript, language = "es", disabled, className }: VoiceInputProps) {
+export function VoiceInput({
+  onTranscript,
+  language = "es",
+  disabled,
+  className,
+  transcribeUrl = "/api/transcribe",
+}: VoiceInputProps) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -107,7 +115,7 @@ export function VoiceInput({ onTranscript, language = "es", disabled, className 
     form.append("audio", blob, `note.${ext}`);
     form.append("language", language);
     try {
-      const res = await fetch("/api/transcribe", { method: "POST", body: form });
+      const res = await fetch(transcribeUrl, { method: "POST", body: form });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         const msg = body.error || `Error ${res.status}`;

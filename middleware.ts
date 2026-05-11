@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIE, verifyToken } from "@/lib/auth";
+import { DEMO_COOKIE, verifyDemoToken } from "@/lib/demo/auth";
 
 export const config = {
   matcher: [
@@ -16,19 +17,61 @@ function passThrough(req: NextRequest): NextResponse {
   return res;
 }
 
+function isDemoRoute(pathname: string): boolean {
+  return (
+    pathname === "/demo" ||
+    pathname.startsWith("/demo/") ||
+    pathname === "/api/demo" ||
+    pathname.startsWith("/api/demo/")
+  );
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
-  // Rutas públicas
+  // Rutas públicas básicas.
   if (pathname === "/login") return passThrough(req);
   if (pathname.startsWith("/api/auth/")) return passThrough(req);
 
+  // Endpoint público que inicia la sesión demo.
+  if (pathname === "/api/demo/start") return passThrough(req);
+
+  // Rutas de la demo: solo se entra con cookie demo válida; nunca con la real.
+  if (isDemoRoute(pathname)) {
+    const demoToken = req.cookies.get(DEMO_COOKIE)?.value;
+    if (!demoToken) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "demo-session-required" }, { status: 401 });
+      }
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    const payload = await verifyDemoToken(demoToken);
+    if (!payload) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "demo-session-invalid" }, { status: 401 });
+      }
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      const res = NextResponse.redirect(url);
+      res.cookies.delete(DEMO_COOKIE);
+      return res;
+    }
+    return passThrough(req);
+  }
+
+  // Bypass de emergencia (solo afecta a rutas reales).
   if (process.env.BYPASS_AUTH === "true") return passThrough(req);
 
   // Routes con su propia auth (x-job-secret) — la ruta valida el header.
-  // Permite que curl manuales y los scripts de jobs sigan funcionando.
   if (req.headers.get("x-job-secret")) return passThrough(req);
 
+  // Rutas reales: exigen neonet-auth. La cookie demo NO concede acceso aquí
+  // bajo ninguna circunstancia, para que un usuario demo no pueda ver datos
+  // reales aunque manipule cookies.
   const token = req.cookies.get(AUTH_COOKIE)?.value;
   if (token) {
     const payload = await verifyToken(token);
