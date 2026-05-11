@@ -27,7 +27,69 @@ interface WindowWithSpeech extends Window {
   webkitSpeechRecognition?: SpeechRecognitionCtor;
 }
 
-const HARD_STOP_SECONDS = 30; // Whisper en Vercel Hobby tiene 10s de timeout
+const HARD_STOP_SECONDS = 30;
+const UPLOAD_TIMEOUT_MS = 55_000;
+const IDB_NAME = "neonet-voice";
+const IDB_STORE = "pending";
+const IDB_KEY = "latest";
+
+interface PendingBlob {
+  blob: Blob;
+  mime: string;
+  language: string;
+  createdAt: number;
+}
+
+function openIdb(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === "undefined") return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function idbPut(value: PendingBlob): Promise<void> {
+  const db = await openIdb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).put(value, IDB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+    tx.onabort = () => resolve();
+  });
+  db.close();
+}
+
+async function idbGet(): Promise<PendingBlob | null> {
+  const db = await openIdb();
+  if (!db) return null;
+  const result = await new Promise<PendingBlob | null>((resolve) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+    req.onsuccess = () => resolve((req.result as PendingBlob | undefined) ?? null);
+    req.onerror = () => resolve(null);
+  });
+  db.close();
+  return result;
+}
+
+async function idbDel(): Promise<void> {
+  const db = await openIdb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).delete(IDB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+    tx.onabort = () => resolve();
+  });
+  db.close();
+}
 
 export interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -44,6 +106,7 @@ type State =
   | { kind: "recording"; startedAt: number; elapsed: number }
   | { kind: "uploading" }
   | { kind: "fallback-listening" }
+  | { kind: "recoverable"; sizeKb: number }
   | { kind: "error"; message: string; offerFallback: boolean };
 
 function formatElapsed(seconds: number): string {
@@ -108,31 +171,89 @@ export function VoiceInput({
     };
   }, []);
 
-  async function uploadAndTranscribe(blob: Blob) {
-    setState({ kind: "uploading" });
+  // Si hay un audio pendiente de una sesión anterior, ofrece recuperarlo.
+  useEffect(() => {
+    let cancelled = false;
+    void idbGet().then((pending) => {
+      if (cancelled || !pending) return;
+      setState({ kind: "recoverable", sizeKb: Math.round(pending.blob.size / 1024) });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function postAudio(blob: Blob, mime: string): Promise<string> {
     const form = new FormData();
-    const ext = (mimeRef.current ?? "audio/webm").includes("mp4") ? "m4a" : "webm";
+    const ext = mime.includes("mp4") ? "m4a" : "webm";
     form.append("audio", blob, `note.${ext}`);
     form.append("language", language);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
     try {
-      const res = await fetch(transcribeUrl, { method: "POST", body: form });
+      const res = await fetch(transcribeUrl, {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+      });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        const msg = body.error || `Error ${res.status}`;
-        throw new Error(msg);
+        throw new Error(body.error || `Error ${res.status}`);
       }
       const body = (await res.json()) as { text?: string };
-      const text = (body.text ?? "").trim();
-      if (!text) {
-        setState({ kind: "error", message: "Transcripción vacía", offerFallback: true });
-        return;
-      }
-      onTranscript(text);
-      setState({ kind: "idle" });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      setState({ kind: "error", message, offerFallback: true });
+      return (body.text ?? "").trim();
+    } finally {
+      clearTimeout(timer);
     }
+  }
+
+  async function uploadAndTranscribe(blob: Blob, opts?: { skipPersist?: boolean }) {
+    setState({ kind: "uploading" });
+    const mime = mimeRef.current ?? blob.type ?? "audio/webm";
+    if (!opts?.skipPersist) {
+      await idbPut({ blob, mime, language, createdAt: Date.now() });
+    }
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const text = await postAudio(blob, mime);
+        if (!text) {
+          await idbDel();
+          setState({ kind: "error", message: "Transcripción vacía", offerFallback: true });
+          return;
+        }
+        await idbDel();
+        onTranscript(text);
+        setState({ kind: "idle" });
+        return;
+      } catch (e) {
+        lastError = e;
+        const aborted = e instanceof DOMException && e.name === "AbortError";
+        const retriable = aborted || (e instanceof TypeError);
+        if (!retriable || attempt === 1) break;
+      }
+    }
+    const message = lastError instanceof Error ? lastError.message : String(lastError);
+    toast.error("No se pudo transcribir la nota", {
+      description: `${message}. Audio guardado — puedes reintentar.`,
+      duration: 12_000,
+    });
+    setState({ kind: "error", message, offerFallback: true });
+  }
+
+  async function retryPending() {
+    const pending = await idbGet();
+    if (!pending) {
+      setState({ kind: "idle" });
+      return;
+    }
+    mimeRef.current = pending.mime;
+    void uploadAndTranscribe(pending.blob, { skipPersist: true });
+  }
+
+  async function discardPending() {
+    await idbDel();
+    setState({ kind: "idle" });
   }
 
   async function startRecording() {
@@ -276,6 +397,25 @@ export function VoiceInput({
 
   // ---------- render ----------
 
+  if (state.kind === "recoverable") {
+    return (
+      <div className={cn("flex flex-col gap-2", className)}>
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+          <span className="flex-1">Hay una nota de voz sin enviar ({state.sizeKb} KB).</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => void retryPending()}>
+            Reintentar envío
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void discardPending()}>
+            Descartar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (state.kind === "error") {
     return (
       <div className={cn("flex flex-col gap-2", className)}>
@@ -284,7 +424,7 @@ export function VoiceInput({
           <span className="flex-1">{state.message}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setState({ kind: "idle" })}>
+          <Button size="sm" variant="outline" onClick={() => void retryPending()}>
             Reintentar
           </Button>
           {state.offerFallback && (
