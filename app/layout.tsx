@@ -31,8 +31,9 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = (await headers()).get("x-pathname") ?? "";
   const isMobileRoute = pathname.startsWith("/m");
+  const isDemoRoute = pathname === "/demo" || pathname.startsWith("/demo/");
   const isAuthPage = pathname === "/login";
-  const showDesktopShell = !isMobileRoute && !isAuthPage;
+  const showDesktopShell = !isMobileRoute && !isDemoRoute && !isAuthPage;
 
   return (
     <html lang="es" className={cn(GeistSans.variable, GeistMono.variable)} suppressHydrationWarning>

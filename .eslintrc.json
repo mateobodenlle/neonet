@@ -1,0 +1,43 @@
+{
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": [
+        "lib/demo/**/*.{ts,tsx}",
+        "app/demo/**/*.{ts,tsx}",
+        "app/api/demo/**/*.{ts,tsx}",
+        "components/demo/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/lib/supabase",
+                  "@/lib/supabase-admin",
+                  "@/lib/server-actions",
+                  "@/lib/repository",
+                  "@/lib/mobile-actions",
+                  "@/lib/nl-actions",
+                  "@/lib/nl-actions-v2",
+                  "@/lib/observations-actions",
+                  "@/lib/me-profile-actions",
+                  "@/lib/promise-actions",
+                  "@/lib/candidate-actions",
+                  "@/lib/linkedin-insight-actions",
+                  "@/lib/profile-synthesis",
+                  "@/lib/embeddings",
+                  "@/lib/person-prior",
+                  "@/lib/eval-builder/*"
+                ],
+                "message": "Las rutas /demo deben estar totalmente aisladas: no pueden importar módulos que toquen Supabase o el CRM real."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

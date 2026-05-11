@@ -18,7 +18,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { collectMentions, defaultResolution, parseFacets } from "@/lib/extraction-plan";
-import { applyExtraction, discardExtraction } from "@/lib/mobile-actions";
+import {
+  applyExtraction as defaultApply,
+  discardExtraction as defaultDiscard,
+} from "@/lib/mobile-actions";
 import type {
   ExtractionV2,
   ExtractedObservationV2,
@@ -29,14 +32,34 @@ import type {
 import type { MobilePerson } from "@/lib/mobile-types";
 import { cn } from "@/lib/utils";
 
+interface ApplyResultLike {
+  createdPeople: unknown[];
+  createdObservationIds: unknown[];
+  createdEvents: unknown[];
+  supersededObservationIds: unknown[];
+}
+
 interface Props {
   extractionId: string;
   noteText: string;
   extraction: ExtractionV2;
   people: MobilePerson[];
+  /** Server actions inyectables (defaults: las reales). */
+  applyAction?: (id: string, plan: ConfirmedPlanV2) => Promise<ApplyResultLike>;
+  discardAction?: (id: string) => Promise<void>;
+  /** Ruta a la que volver tras aplicar / descartar. */
+  pendingHref?: string;
 }
 
-export function ExtractionReview({ extractionId, noteText, extraction, people }: Props) {
+export function ExtractionReview({
+  extractionId,
+  noteText,
+  extraction,
+  people,
+  applyAction = defaultApply,
+  discardAction = defaultDiscard,
+  pendingHref = "/m/pending",
+}: Props) {
   const router = useRouter();
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
@@ -79,7 +102,7 @@ export function ExtractionReview({ extractionId, noteText, extraction, people }:
       supersedes,
     };
     try {
-      const result = await applyExtraction(extractionId, plan);
+      const result = await applyAction(extractionId, plan);
       const parts = [
         result.createdPeople.length && `${result.createdPeople.length} contactos`,
         result.createdObservationIds.length && `${result.createdObservationIds.length} obs`,
@@ -89,7 +112,7 @@ export function ExtractionReview({ extractionId, noteText, extraction, people }:
       toast.success("Aplicado", {
         description: parts.join(", ") || "Sin cambios",
       });
-      router.replace("/m/pending");
+      router.replace(pendingHref);
       router.refresh();
     } catch (e) {
       toast.error("Error al aplicar", {
@@ -104,9 +127,9 @@ export function ExtractionReview({ extractionId, noteText, extraction, people }:
     setSubmitting("discard");
     setConfirmingDiscard(false);
     try {
-      await discardExtraction(extractionId);
+      await discardAction(extractionId);
       toast.success("Nota descartada");
-      router.replace("/m/pending");
+      router.replace(pendingHref);
       router.refresh();
     } catch (e) {
       toast.error("Error al descartar", {

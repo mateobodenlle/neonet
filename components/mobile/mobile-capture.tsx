@@ -12,7 +12,23 @@ import { processNoteAsync } from "@/lib/mobile-actions";
 
 const BACKUP_KEY = "neonet-pending-note-backup";
 
-export function MobileCapture() {
+interface Props {
+  /** Acción para procesar la nota. Por defecto: server action real. */
+  processNote?: (text: string) => Promise<{ extractionId: string }>;
+  /** Ruta de pendientes (mobile real vs demo). */
+  pendingHref?: string;
+  /** Banner opcional encima del input. */
+  banner?: React.ReactNode;
+  /** Endpoint de transcripción para VoiceInput. */
+  transcribeUrl?: string;
+}
+
+export function MobileCapture({
+  processNote = processNoteAsync,
+  pendingHref = "/m/pending",
+  banner,
+  transcribeUrl,
+}: Props = {}) {
   const router = useRouter();
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -54,7 +70,7 @@ export function MobileCapture() {
     }
     const toastId = toast.loading("Procesando nota…");
     try {
-      await processNoteAsync(snapshot);
+      await processNote(snapshot);
       try {
         localStorage.removeItem(BACKUP_KEY);
       } catch {
@@ -64,7 +80,7 @@ export function MobileCapture() {
         id: toastId,
         action: {
           label: "Ver",
-          onClick: () => router.push("/m/pending"),
+          onClick: () => router.push(pendingHref),
         },
       });
       // Recarga el server layout → contador del header al día.
@@ -91,6 +107,7 @@ export function MobileCapture() {
 
   return (
     <div className="space-y-4">
+      {banner}
       <div className="space-y-2">
         <h1 className="text-lg font-semibold tracking-tight">Captura</h1>
         <p className="text-xs text-muted-foreground">
@@ -107,7 +124,7 @@ export function MobileCapture() {
       />
 
       <div className="flex items-center justify-between gap-2">
-        <VoiceInput onTranscript={onTranscript} />
+        <VoiceInput onTranscript={onTranscript} transcribeUrl={transcribeUrl} />
       </div>
 
       <Button
@@ -125,7 +142,7 @@ export function MobileCapture() {
 
       <div className="pt-2 text-center">
         <Link
-          href="/m/pending"
+          href={pendingHref}
           className="text-sm text-muted-foreground underline-offset-4 hover:underline"
         >
           Ver pendientes →

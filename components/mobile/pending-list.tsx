@@ -18,6 +18,10 @@ export interface PendingItem {
 
 interface Props {
   items: PendingItem[];
+  /** Prefijo para los enlaces de detalle. Default: /m/pending */
+  basePath?: string;
+  /** Ruta de "volver a capturar" cuando no hay pendientes. */
+  captureHref?: string;
 }
 
 function snippet(text: string, max = 90): string {
@@ -33,7 +37,11 @@ function relative(iso: string): string {
   }
 }
 
-export function PendingList({ items }: Props) {
+export function PendingList({
+  items,
+  basePath = "/m/pending",
+  captureHref = "/m",
+}: Props) {
   const router = useRouter();
 
   return (
@@ -57,7 +65,7 @@ export function PendingList({ items }: Props) {
           <Inbox className="h-6 w-6 opacity-50" />
           <div>No hay nada pendiente.</div>
           <Link
-            href="/m"
+            href={captureHref}
             className="text-accent underline-offset-4 hover:underline"
           >
             Volver a capturar
@@ -68,7 +76,7 @@ export function PendingList({ items }: Props) {
           {items.map((item) => (
             <li key={item.id}>
               <Link
-                href={`/m/pending/${item.id}`}
+                href={`${basePath}/${item.id}`}
                 className="block rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-secondary/40"
               >
                 <div className="flex items-start justify-between gap-2">

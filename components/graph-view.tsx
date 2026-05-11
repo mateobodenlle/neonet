@@ -12,9 +12,16 @@ interface Props {
   people: Person[];
   edges: Edge[];
   coEventEdges: { key: string; weight: number }[];
+  /** Prefijo para los enlaces de detalle. Default: /contacts */
+  contactLinkPrefix?: string;
 }
 
-export function GraphView({ people, edges, coEventEdges }: Props) {
+export function GraphView({
+  people,
+  edges,
+  coEventEdges,
+  contactLinkPrefix = "/contacts",
+}: Props) {
   const { nodes, rfEdges } = useMemo(() => {
     const radius = Math.max(360, people.length * 15);
     const nodes: RFNode[] = people.map((p, i) => {
@@ -24,7 +31,7 @@ export function GraphView({ people, edges, coEventEdges }: Props) {
         position: { x: radius * Math.cos(angle), y: radius * Math.sin(angle) },
         data: {
           label: (
-            <Link href={`/contacts/${p.id}`} className="flex items-center gap-1.5 px-2 py-1 leading-tight">
+            <Link href={`${contactLinkPrefix}/${p.id}`} className="flex items-center gap-1.5 px-2 py-1 leading-tight">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: tempDot[p.temperature] }} />
               <div className="min-w-0">
                 <div className="truncate text-[12px] font-medium">{p.fullName}</div>
@@ -66,7 +73,7 @@ export function GraphView({ people, edges, coEventEdges }: Props) {
       });
     }
     return { nodes, rfEdges };
-  }, [people, edges, coEventEdges]);
+  }, [people, edges, coEventEdges, contactLinkPrefix]);
 
   return (
     <ReactFlow nodes={nodes} edges={rfEdges} fitView minZoom={0.2} maxZoom={1.5} proOptions={{ hideAttribution: true }}>
