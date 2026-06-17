@@ -155,7 +155,7 @@ export function ExtractionReview({
             {extraction.warnings.map((w, i) => (
               <div
                 key={i}
-                className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-400"
+                className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[12px] text-warning"
               >
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{w}</span>
@@ -323,7 +323,7 @@ function MentionCard({
     <div
       className={cn(
         "rounded-lg border bg-card px-3 py-3",
-        conf === "low" ? "border-amber-500/40" : "border-border",
+        conf === "low" ? "border-warning/40" : "border-border",
       )}
     >
       <div className="flex items-center gap-2 text-[14px] font-medium">
@@ -493,8 +493,8 @@ function ObservationCard({
       )}
 
       {hint && hint.candidate_observation_ids.length > 0 && (
-        <div className="mt-2 rounded border border-blue-500/30 bg-blue-500/5 px-2 py-1.5 text-[11px]">
-          <div className="text-blue-600 dark:text-blue-400">Posible reemplazo: {hint.reason}</div>
+        <div className="mt-2 rounded border border-info/30 bg-info/5 px-2 py-1.5 text-[11px]">
+          <div className="text-info">Posible reemplazo: {hint.reason}</div>
           <div className="mt-1.5 space-y-1">
             {hint.candidate_observation_ids.map((oid) => {
               const checked = supersedesIds.includes(oid);
@@ -503,7 +503,7 @@ function ObservationCard({
                   key={oid}
                   className={cn(
                     "flex items-center gap-2 rounded border px-2 py-1.5 cursor-pointer",
-                    checked ? "border-blue-500 bg-blue-500/10" : "border-border bg-background",
+                    checked ? "border-info bg-info/10" : "border-border bg-background",
                   )}
                 >
                   <input
@@ -531,10 +531,10 @@ function ObservationCard({
 function ConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low" }) {
   const styles =
     confidence === "high"
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+      ? "border-success/40 bg-success/10 text-success"
       : confidence === "medium"
       ? "border-border bg-secondary/60 text-muted-foreground"
-      : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400";
+      : "border-warning/40 bg-warning/10 text-warning";
   const label = confidence === "high" ? "alta" : confidence === "medium" ? "media" : "baja";
   return (
     <span className={cn("inline-flex rounded border px-1 py-0 text-[10px] uppercase tracking-wide", styles)}>

@@ -86,7 +86,7 @@ export function NLPreviewV2({
           {extraction.warnings.map((w, i) => (
             <div
               key={i}
-              className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-400"
+              className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[12px] text-warning"
             >
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span>{w}</span>
@@ -106,7 +106,7 @@ export function NLPreviewV2({
                 key={m.text}
                 className={`rounded-md border bg-card px-3 py-2.5 ${
                   conf === "low"
-                    ? "border-amber-500/40"
+                    ? "border-warning/40"
                     : conf === "medium"
                     ? "border-border"
                     : "border-border/50"
@@ -254,8 +254,8 @@ export function NLPreviewV2({
                   </div>
                 </div>
                 {hint && hint.candidate_observation_ids.length > 0 && (
-                  <div className="mt-2 rounded border border-blue-500/30 bg-blue-500/5 px-2 py-1.5 text-[11px]">
-                    <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                  <div className="mt-2 rounded border border-info/30 bg-info/5 px-2 py-1.5 text-[11px]">
+                    <div className="flex items-center gap-1 text-info">
                       <ArrowRightLeft className="h-3 w-3" />
                       Posible reemplazo: {hint.reason}
                     </div>
@@ -267,7 +267,7 @@ export function NLPreviewV2({
                             key={oid}
                             className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 cursor-pointer ${
                               checked
-                                ? "border-blue-500 bg-blue-500/10"
+                                ? "border-info bg-info/10"
                                 : "border-border bg-background"
                             }`}
                           >
@@ -335,10 +335,10 @@ export function NLPreviewV2({
 function ConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low" }) {
   const styles =
     confidence === "high"
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+      ? "border-success/40 bg-success/10 text-success"
       : confidence === "medium"
       ? "border-border bg-secondary/60 text-muted-foreground"
-      : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400";
+      : "border-warning/40 bg-warning/10 text-warning";
   const label =
     confidence === "high" ? "alta" : confidence === "medium" ? "media" : "baja";
   return (

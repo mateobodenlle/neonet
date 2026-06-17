@@ -59,7 +59,7 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-xl border border-border bg-background p-6 shadow-sm">
+    <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg border border-border bg-background p-6 shadow-sm">
       <div className="space-y-1">
         <h1 className="text-lg font-semibold tracking-tight">Neonet</h1>
         <p className="text-xs text-muted-foreground">Introduce la contraseña para continuar.</p>

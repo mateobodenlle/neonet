@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 import { TemperatureBadge } from "@/components/temperature-badge";
 
 const options: { value: Temperature; label: string; dot: string }[] = [
-  { value: "caliente", label: "Caliente", dot: "bg-red-500" },
-  { value: "tibio", label: "Tibio", dot: "bg-amber-500" },
-  { value: "frio", label: "Frío", dot: "bg-slate-400" },
+  { value: "caliente", label: "Caliente", dot: "bg-temp-hot" },
+  { value: "tibio", label: "Tibio", dot: "bg-temp-warm" },
+  { value: "frio", label: "Frío", dot: "bg-temp-cold" },
 ];
 
 export function TemperaturePicker({

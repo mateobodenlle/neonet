@@ -18,7 +18,7 @@ export default async function DemoLayout({ children }: { children: React.ReactNo
   }
 
   const banner = (
-    <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-[12px] text-amber-700 dark:text-amber-400">
+    <div className="border-b border-warning/30 bg-warning/10 px-4 py-2 text-center text-[12px] text-warning">
       Modo demo — los cambios no se guardan. Datos ficticios, extracción con OpenAI real.
     </div>
   );

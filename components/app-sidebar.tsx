@@ -19,7 +19,7 @@ export function AppSidebar() {
   return (
     <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-border bg-background">
       <div className="px-5 pt-6 pb-2">
-        <div className="text-[15px] font-semibold tracking-tight">Agenda</div>
+        <div className="text-[15px] font-semibold tracking-tight">Neonet</div>
       </div>
 
       <button
