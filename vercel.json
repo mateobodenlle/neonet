@@ -9,7 +9,11 @@
       "maxDuration": 60
     },
     "app/api/jobs/synthesize/route.ts": {
-      "maxDuration": 10
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/jobs/synthesize?mode=process-dirty", "schedule": "0 3 * * *" },
+    { "path": "/api/jobs/synthesize?mode=refresh-priors", "schedule": "0 4 * * *" }
+  ]
 }
