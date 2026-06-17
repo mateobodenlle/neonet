@@ -111,7 +111,7 @@ export function MobileCapture({
       <div className="space-y-2">
         <h1 className="text-lg font-semibold tracking-tight">Captura</h1>
         <p className="text-xs text-muted-foreground">
-          Texto libre. La extracción se ejecuta en background — puedes seguir capturando.
+          Texto libre. Al procesar, la nota se extrae y queda en pendientes para revisar.
         </p>
       </div>
 
