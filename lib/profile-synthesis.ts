@@ -8,7 +8,7 @@ import "server-only";
  *   markProfileDirty       — re-export from server-actions for convenience.
  *   processDirtyProfiles   — batch job: pick stale dirty profiles, synthesize.
  *
- * Synthesis uses SYNTHESIS_MODEL (gpt-4o by default) — quality-critical
+ * Synthesis uses SYNTHESIS_MODEL (gpt-5 by default) — quality-critical
  * because the profile snippet is what every extraction call sees in the
  * directory.
  */
@@ -131,7 +131,10 @@ async function callSynthesis(
     async () => {
       const completion = await openai.chat.completions.create({
         model: SYNTHESIS_MODEL,
-        temperature: 0.2,
+        // No explicit temperature: the default synthesis model (gpt-5) is a
+        // reasoning model that only accepts the default (1) and 400s on any
+        // other value. Synthesis is a summarization task, so the default is
+        // fine; omitting it keeps the call working across model choices.
         response_format: { type: "json_schema", json_schema: PROFILE_SCHEMA as never },
         messages: [
           { role: "system", content: profileSystemPrompt(today) },
