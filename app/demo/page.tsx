@@ -52,15 +52,16 @@ export default async function DemoHomePage() {
             </CardHeader>
             <CardContent className="p-0">
               <ul className="divide-y divide-border">
-                {data.recentEncounters.map((en) => (
-                  <li key={en.id}>
-                    {en.person ? (
+                {data.recentEncounters
+                  .filter((en) => en.person)
+                  .map((en) => (
+                    <li key={en.id}>
                       <Link
-                        href={`/demo/contacts/${en.person.id}`}
+                        href={`/demo/contacts/${en.person!.id}`}
                         className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-3 px-5 py-2.5 hover:bg-secondary/40"
                       >
-                        <PersonAvatar person={en.person} className="h-7 w-7" />
-                        <div className="text-[13px] font-medium">{en.person.fullName}</div>
+                        <PersonAvatar person={en.person!} className="h-7 w-7" />
+                        <div className="text-[13px] font-medium">{en.person!.fullName}</div>
                         <div className="min-w-0 truncate text-[13px] text-muted-foreground">
                           {en.context ?? en.event?.name ?? en.location ?? "—"}
                         </div>
@@ -68,9 +69,8 @@ export default async function DemoHomePage() {
                           {relativeDate(en.date)}
                         </span>
                       </Link>
-                    ) : null}
-                  </li>
-                ))}
+                    </li>
+                  ))}
               </ul>
             </CardContent>
           </Card>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getExtractionById } from "@/lib/repository";
-import { loadPeopleByIds } from "@/lib/mobile-actions";
+import { loadPeopleByIds, searchDirectory, loadObservationSnippets } from "@/lib/mobile-actions";
 import { collectCandidateIds } from "@/lib/extraction-plan";
 import { ExtractionReview } from "@/components/mobile/extraction-review";
 
@@ -49,6 +49,8 @@ export default async function ReviewPage({ params }: PageProps) {
       noteText={row.note_text}
       extraction={row.raw_extraction}
       people={people}
+      searchPeople={searchDirectory}
+      fetchSnippets={loadObservationSnippets}
     />
   );
 }

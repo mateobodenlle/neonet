@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -13,11 +13,12 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { collectMentions, defaultResolution, parseFacets } from "@/lib/extraction-plan";
+import { collectMentions, defaultResolution, parseFacets, roleLabel, collectSupersedeHintIds } from "@/lib/extraction-plan";
 import {
   applyExtraction as defaultApply,
   discardExtraction as defaultDiscard,
@@ -30,7 +31,7 @@ import type {
   ConfirmedPlanV2,
 } from "@/lib/nl-types";
 import type { MobilePerson } from "@/lib/mobile-types";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 interface ApplyResultLike {
   createdPeople: unknown[];
@@ -47,6 +48,12 @@ interface Props {
   /** Server actions inyectables (defaults: las reales). */
   applyAction?: (id: string, plan: ConfirmedPlanV2) => Promise<ApplyResultLike>;
   discardAction?: (id: string) => Promise<void>;
+  /** Resuelve ids de observación a contenido para el preview de supersede.
+   *  Inyectable para que la demo no toque la BD real (isolation). */
+  fetchSnippets?: (ids: string[]) => Promise<Record<string, { content: string; observedAt: string }>>;
+  /** Busca en el directorio para resolver una mención a cualquier contacto
+   *  existente (no solo los candidatos). Inyectable por isolation. */
+  searchPeople?: (query: string) => Promise<MobilePerson[]>;
   /** Ruta a la que volver tras aplicar / descartar. */
   pendingHref?: string;
 }
@@ -58,12 +65,28 @@ export function ExtractionReview({
   people,
   applyAction = defaultApply,
   discardAction = defaultDiscard,
+  fetchSnippets,
+  searchPeople,
   pendingHref = "/m/pending",
 }: Props) {
   const router = useRouter();
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
   const mentions = useMemo(() => collectMentions(extraction), [extraction]);
+
+  const [snippets, setSnippets] = useState<Record<string, { content: string; observedAt: string }>>({});
+  useEffect(() => {
+    if (!fetchSnippets) return;
+    const ids = collectSupersedeHintIds(extraction);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    fetchSnippets(ids)
+      .then((s) => !cancelled && setSnippets(s))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [extraction, fetchSnippets]);
 
   const [resolutions, setResolutions] = useState<Record<string, MentionResolution>>(() => {
     const init: Record<string, MentionResolution> = {};
@@ -149,13 +172,20 @@ export function ExtractionReview({
           </div>
         </Section>
 
+        {/* Resumen del modelo — confirma que entendió la nota antes de aplicar */}
+        {extraction.summary && (
+          <div className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-[13px] text-muted-foreground">
+            {extraction.summary}
+          </div>
+        )}
+
         {/* Warnings */}
         {extraction.warnings?.length > 0 && (
           <div className="space-y-1.5">
             {extraction.warnings.map((w, i) => (
               <div
                 key={i}
-                className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-700 dark:text-amber-400"
+                className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[12px] text-warning"
               >
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{w}</span>
@@ -174,6 +204,7 @@ export function ExtractionReview({
                   mention={m}
                   resolution={resolutions[m.text]}
                   peopleById={peopleById}
+                  searchPeople={searchPeople}
                   onSet={(r) => setResolution(m.text, r)}
                 />
               ))}
@@ -192,6 +223,7 @@ export function ExtractionReview({
                   index={i}
                   skipped={!isIncluded(o.primary_mention.text)}
                   nameForText={nameForText}
+                  snippets={snippets}
                   supersedesIds={supersedes[i] ?? []}
                   onChangeSupersedes={(ids) =>
                     setSupersedes((prev) => ({ ...prev, [i]: ids }))
@@ -301,14 +333,18 @@ function MentionCard({
   mention,
   resolution,
   peopleById,
+  searchPeople,
   onSet,
 }: {
   mention: PersonMention;
   resolution: MentionResolution | undefined;
   peopleById: Map<string, MobilePerson>;
+  searchPeople?: (query: string) => Promise<MobilePerson[]>;
   onSet: (r: MentionResolution) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
+  // A contact chosen via directory search that wasn't among the candidates.
+  const [picked, setPicked] = useState<MobilePerson | null>(null);
   const conf = mention.confidence ?? "medium";
   const topId = mention.candidate_ids[0];
   const restIds = mention.candidate_ids.slice(1);
@@ -318,12 +354,13 @@ function MentionCard({
     resolution?.kind === "existing" && resolution.personId === id;
   const isNew = resolution?.kind === "new";
   const isSkip = !resolution || resolution.kind === "skip";
+  const showPicked = picked && !mention.candidate_ids.includes(picked.id);
 
   return (
     <div
       className={cn(
         "rounded-lg border bg-card px-3 py-3",
-        conf === "low" ? "border-amber-500/40" : "border-border",
+        conf === "low" ? "border-warning/40" : "border-border",
       )}
     >
       <div className="flex items-center gap-2 text-[14px] font-medium">
@@ -379,6 +416,26 @@ function MentionCard({
           />
         )}
 
+        {showPicked && (
+          <ChoiceButton
+            selected={isExisting(picked!.id)}
+            icon={<User className="h-4 w-4" />}
+            label={picked!.full_name}
+            sub={[picked!.role, picked!.company].filter(Boolean).join(" · ") || undefined}
+            onClick={() => onSet({ kind: "existing", personId: picked!.id })}
+          />
+        )}
+
+        {searchPeople && (
+          <DirectorySearch
+            searchPeople={searchPeople}
+            onPick={(p) => {
+              setPicked(p);
+              onSet({ kind: "existing", personId: p.id });
+            }}
+          />
+        )}
+
         <ChoiceButton
           selected={isSkip}
           icon={<MinusCircle className="h-4 w-4" />}
@@ -386,6 +443,83 @@ function MentionCard({
           onClick={() => onSet({ kind: "skip" })}
         />
       </div>
+    </div>
+  );
+}
+
+function DirectorySearch({
+  searchPeople,
+  onPick,
+}: {
+  searchPeople: (query: string) => Promise<MobilePerson[]>;
+  onPick: (p: MobilePerson) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<MobilePerson[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = q.trim();
+    if (t.length < 2) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    const handle = setTimeout(() => {
+      searchPeople(t)
+        .then((r) => !cancelled && setResults(r))
+        .catch(() => {})
+        .finally(() => !cancelled && setLoading(false));
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [q, open, searchPeople]);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center gap-2.5 rounded-md border border-dashed border-border bg-background px-3 py-2.5 text-left text-[13px] text-muted-foreground transition-colors hover:bg-secondary/40"
+      >
+        <Search className="h-4 w-4" />
+        Buscar otro contacto…
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5 rounded-md border border-border bg-background p-2">
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Nombre, empresa…"
+        autoFocus
+        className="w-full rounded border border-input bg-background px-2.5 py-2 text-[16px] outline-none focus:border-ring"
+      />
+      {loading && <div className="px-1 py-1 text-[12px] text-muted-foreground">Buscando…</div>}
+      {!loading && q.trim().length >= 2 && results.length === 0 && (
+        <div className="px-1 py-1 text-[12px] text-muted-foreground">Sin resultados.</div>
+      )}
+      {results.map((p) => (
+        <ChoiceButton
+          key={p.id}
+          selected={false}
+          icon={<User className="h-4 w-4" />}
+          label={p.full_name}
+          sub={[p.role, p.company].filter(Boolean).join(" · ") || undefined}
+          onClick={() => {
+            onPick(p);
+            setOpen(false);
+            setQ("");
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -431,6 +565,7 @@ function ObservationCard({
   index,
   skipped,
   nameForText,
+  snippets,
   supersedesIds,
   onChangeSupersedes,
 }: {
@@ -438,6 +573,7 @@ function ObservationCard({
   index: number;
   skipped: boolean;
   nameForText: (text: string) => string;
+  snippets: Record<string, { content: string; observedAt: string }>;
   supersedesIds: string[];
   onChangeSupersedes: (ids: string[]) => void;
 }) {
@@ -475,7 +611,7 @@ function ObservationCard({
         <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
           {observation.participants.map((p, k) => (
             <span key={k}>
-              <span className="opacity-60">{p.role}</span>{" "}
+              <span className="opacity-60">{roleLabel(p.role)}</span>{" "}
               <span className="text-foreground">{nameForText(p.mention.text)}</span>
             </span>
           ))}
@@ -493,22 +629,23 @@ function ObservationCard({
       )}
 
       {hint && hint.candidate_observation_ids.length > 0 && (
-        <div className="mt-2 rounded border border-blue-500/30 bg-blue-500/5 px-2 py-1.5 text-[11px]">
-          <div className="text-blue-600 dark:text-blue-400">Posible reemplazo: {hint.reason}</div>
+        <div className="mt-2 rounded border border-info/30 bg-info/5 px-2 py-1.5 text-[11px]">
+          <div className="text-info">Posible reemplazo: {hint.reason}</div>
           <div className="mt-1.5 space-y-1">
             {hint.candidate_observation_ids.map((oid) => {
               const checked = supersedesIds.includes(oid);
+              const snip = snippets[oid];
               return (
                 <label
                   key={oid}
                   className={cn(
-                    "flex items-center gap-2 rounded border px-2 py-1.5 cursor-pointer",
-                    checked ? "border-blue-500 bg-blue-500/10" : "border-border bg-background",
+                    "flex items-start gap-2 rounded border px-2 py-1.5 cursor-pointer",
+                    checked ? "border-info bg-info/10" : "border-border bg-background",
                   )}
                 >
                   <input
                     type="checkbox"
-                    className="h-4 w-4"
+                    className="mt-0.5 h-4 w-4 shrink-0"
                     checked={checked}
                     onChange={(e) => {
                       const next = e.target.checked
@@ -517,7 +654,12 @@ function ObservationCard({
                       onChangeSupersedes(next);
                     }}
                   />
-                  <code className="text-[10px]">{oid.slice(0, 8)}</code>
+                  <span className="min-w-0 flex-1 text-[12px] text-foreground">
+                    {snip ? snip.content : `obs ${oid.slice(0, 8)}…`}
+                    {snip?.observedAt && (
+                      <span className="ml-1 text-[10px] text-muted-foreground">· {formatDate(snip.observedAt)}</span>
+                    )}
+                  </span>
                 </label>
               );
             })}
@@ -531,10 +673,10 @@ function ObservationCard({
 function ConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low" }) {
   const styles =
     confidence === "high"
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+      ? "border-success/40 bg-success/10 text-success"
       : confidence === "medium"
       ? "border-border bg-secondary/60 text-muted-foreground"
-      : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400";
+      : "border-warning/40 bg-warning/10 text-warning";
   const label = confidence === "high" ? "alta" : confidence === "medium" ? "media" : "baja";
   return (
     <span className={cn("inline-flex rounded border px-1 py-0 text-[10px] uppercase tracking-wide", styles)}>

@@ -169,15 +169,19 @@ export interface DirectoryRowV2 {
   narrative_snippet: string | null;
 }
 
-/** Sort by prior_score desc, then full_name asc, so the most relevant
- *  contacts appear first in the prompt. The model is told that order
- *  is meaningful. */
+/**
+ * Sort by id (stable) and show the prior bucketed to an integer. Both choices
+ * are deliberate: the directory is the largest, cacheable part of the system
+ * prompt, so it must be byte-stable across calls. The previous prior-desc
+ * order plus a one-decimal prior meant that the per-apply prior recompute
+ * reordered the list and rewrote the numbers on almost every note, busting
+ * both OpenAI's implicit prefix cache and the prompt_cache_key (a hash of this
+ * string). Id-order never changes; an integer prior only changes when a
+ * contact crosses a whole bucket — rare. The model reads relevance from the
+ * `prior:N` field on each row, not from position (see the prompt rules).
+ */
 export function compactDirectoryV2(people: DirectoryRowV2[]): string {
-  const sorted = [...people].sort((a, b) => {
-    const ps = (b.prior_score ?? 0) - (a.prior_score ?? 0);
-    if (ps !== 0) return ps;
-    return a.full_name.localeCompare(b.full_name);
-  });
+  const sorted = [...people].sort((a, b) => a.id.localeCompare(b.id));
   return sorted
     .map((p) => {
       const aliases = (p.aliases ?? []).filter(Boolean);
@@ -186,7 +190,7 @@ export function compactDirectoryV2(people: DirectoryRowV2[]): string {
         : p.full_name;
       const co = [p.company, p.role].filter(Boolean).join(" – ") || "-";
       const tags = (p.tags ?? []).join(",") || "-";
-      const prior = (p.prior_score ?? 0).toFixed(1);
+      const prior = Math.max(0, Math.round(p.prior_score ?? 0));
       const snippet = (p.narrative_snippet ?? "").trim().replace(/\s+/g, " ");
       const tail = snippet ? ` :: ${snippet.slice(0, 140)}` : "";
       return `${p.id} | ${namePart} | ${co} | ${tags} | prior:${prior}${tail}`;
@@ -271,11 +275,11 @@ export function systemPromptV2(
     "",
     "## DESAMBIGUACIÓN POR PRIOR",
     "",
-    "El directorio viene ordenado por `prior:N` (mayor primero). El prior combina cercanía personal + actividad reciente — un contacto con prior alto es *muy probablemente* a quien se refiere el usuario cuando lo menciona por primera vez. Reglas:",
+    "Cada fila del directorio trae su `prior:N` (entero ≥ 0). El directorio está ordenado por id (sin significado), así que **NO uses la posición**: lee el valor `prior:N` de cada contacto. El prior combina cercanía personal + actividad reciente — un contacto con prior alto es *muy probablemente* a quien se refiere el usuario cuando lo menciona por primera vez. Reglas:",
     "",
     "1. **Prior ≥ 3 + único candidato fuerte** → asume sin warning. `confidence: 'high'`.",
-    "2. **Un candidato destaca claramente sobre los demás** (delta de prior ≥ 1.5 sobre el segundo, o el segundo tiene prior < 1) → asume con warning suave (\"hay otros X en el directorio, asumí Y por contexto\"). `confidence: 'medium'`. `candidate_ids` ordenados con tu apuesta primero.",
-    "3. **Empate o todos débiles** (todos < 1, o delta < 0.5) → ambigüedad real, warning fuerte, `confidence: 'low'`, `candidate_ids` con todos los plausibles.",
+    "2. **Un candidato destaca claramente sobre los demás** (su prior supera al del segundo en ≥ 2, o el segundo tiene prior 0) → asume con warning suave (\"hay otros X en el directorio, asumí Y por contexto\"). `confidence: 'medium'`. `candidate_ids` ordenados con tu apuesta primero.",
+    "3. **Empate o todos débiles** (todos con prior 0-1, o priors iguales) → ambigüedad real, warning fuerte, `confidence: 'low'`, `candidate_ids` con todos los plausibles.",
     "4. **Nombre exacto + prior alto** (ej. el contacto se llama \"Judit Vázquez\" y prior ≥ 4) → asume directo aunque haya otras Judit, salvo contradicción contextual clara (empresa, evento, rol).",
     "",
     "El campo `confidence` es obligatorio en cada mention. Úsalo con honestidad — el usuario decide la UI según ese valor.",
@@ -292,7 +296,7 @@ export function systemPromptV2(
     "- Direcciones de promesa: `yo-a-el` si el usuario se compromete; `el-a-mi` si la otra parte se compromete con el usuario.",
     "- **El usuario NO es un contacto.** Nunca emitas una observación cuyo `primary_mention` sea el usuario, ni lo añadas como participante. Sus acciones (\"yo le mandé X\", \"hablé con Y\") quedan implícitas como contexto del hecho sobre el OTRO. Si la nota es 100% sobre el usuario sin involucrar a nadie más, no emitas nada y mete un warning. El directorio NO contiene al usuario aunque su nombre aparezca en la nota.",
     "",
-    "## Directorio de contactos (id | nombre [/alias] | empresa – rol | tags | prior:N :: snippet del perfil) — ORDENADO POR PRIOR DESCENDENTE",
+    "## Directorio de contactos (id | nombre [/alias] | empresa – rol | tags | prior:N :: snippet del perfil) — ORDEN ESTABLE POR ID; la relevancia está en el campo prior:N de cada fila",
     "",
     directory,
     "",

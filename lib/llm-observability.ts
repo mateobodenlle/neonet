@@ -92,7 +92,18 @@ export async function logLlmCall(input: LogInput): Promise<void> {
       person_ids: input.personIds ?? [],
       metadata: input.metadata ?? {},
     });
-    if (error) console.error("logLlmCall: insert failed", error);
+    if (error) {
+      console.error("logLlmCall: insert failed", { purpose: input.purpose, model: input.model, error });
+      // Surface schema/enum drift loudly in dev so a rejected purpose can't
+      // ship silently the way the 'transcription' CHECK drift did. Still a
+      // no-throw path — logging must never break the operation it observes.
+      if (process.env.NODE_ENV !== "production") {
+        console.error(
+          `logLlmCall: INSERT REJECTED for purpose='${input.purpose}'. If this is a CHECK ` +
+            `violation, the llm_calls_purpose constraint is missing this value — add a migration.`,
+        );
+      }
+    }
   } catch (e) {
     console.error("logLlmCall: unexpected error", e);
   }

@@ -45,3 +45,35 @@ export async function loadPeopleByIds(ids: string[]): Promise<MobilePerson[]> {
   return (data ?? []) as MobilePerson[];
 }
 
+/** Search the directory so the mobile review can resolve a mention to ANY
+ *  existing contact (not just the LLM's candidates) and avoid duplicates. */
+export async function searchDirectory(query: string): Promise<MobilePerson[]> {
+  const safe = query.replace(/[%,()*]/g, " ").trim();
+  if (safe.length < 2) return [];
+  const { data, error } = await supabaseAdmin
+    .from("people")
+    .select("id, full_name, role, company")
+    .eq("archived", false)
+    .or(`full_name.ilike.%${safe}%,company.ilike.%${safe}%,role.ilike.%${safe}%`)
+    .limit(8);
+  if (error) throw error;
+  return (data ?? []) as MobilePerson[];
+}
+
+/** Resolve observation ids to content for the supersede preview. */
+export async function loadObservationSnippets(
+  ids: string[],
+): Promise<Record<string, { content: string; observedAt: string }>> {
+  if (ids.length === 0) return {};
+  const { data, error } = await supabaseAdmin
+    .from("observations")
+    .select("id, content, observed_at")
+    .in("id", ids);
+  if (error) throw error;
+  const out: Record<string, { content: string; observedAt: string }> = {};
+  for (const r of data ?? []) {
+    out[r.id as string] = { content: r.content as string, observedAt: r.observed_at as string };
+  }
+  return out;
+}
+

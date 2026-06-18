@@ -400,8 +400,8 @@ export function VoiceInput({
   if (state.kind === "recoverable") {
     return (
       <div className={cn("flex flex-col gap-2", className)}>
-        <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+        <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
           <span className="flex-1">Hay una nota de voz sin enviar ({state.sizeKb} KB).</span>
         </div>
         <div className="flex items-center gap-2">

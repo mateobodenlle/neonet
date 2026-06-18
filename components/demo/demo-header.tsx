@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 
 interface Props {
   pendingCount: number;
-  /** "mobile" → header móvil; "desktop" no se usa (lo cubre la sidebar). */
-  variant?: "mobile";
 }
 
 export function DemoHeader({ pendingCount }: Props) {

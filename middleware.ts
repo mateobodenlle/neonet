@@ -69,6 +69,16 @@ export async function middleware(req: NextRequest) {
   // Routes con su propia auth (x-job-secret) — la ruta valida el header.
   if (req.headers.get("x-job-secret")) return passThrough(req);
 
+  // Schedulers (Vercel Cron / cron-job.org) llaman a /api/jobs/* con
+  // Authorization: Bearer <CRON_SECRET> en vez de cookie. Se deja pasar; la
+  // ruta valida el secreto real (mismo patrón que x-job-secret).
+  if (
+    pathname.startsWith("/api/jobs/") &&
+    req.headers.get("authorization")?.startsWith("Bearer ")
+  ) {
+    return passThrough(req);
+  }
+
   // Rutas reales: exigen neonet-auth. La cookie demo NO concede acceso aquí
   // bajo ninguna circunstancia, para que un usuario demo no pueda ver datos
   // reales aunque manipule cookies.

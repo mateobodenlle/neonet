@@ -175,7 +175,7 @@ export function ReviewDeck({
   if (!current) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-card p-12 text-center">
-        <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+        <CheckCircle2 className="h-10 w-10 text-success" />
         <div className="text-lg font-medium">No quedan conexiones por revisar</div>
         <p className="max-w-md text-[13px] text-muted-foreground">
           Todas tus conexiones de LinkedIn están clasificadas. Aceptadas:{" "}

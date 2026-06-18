@@ -8,35 +8,13 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 import { createClient } from "@supabase/supabase-js";
+import { computePrior } from "../../lib/person-prior-score";
 
 const supa = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
-
-const CLOSENESS_WEIGHT: Record<string, number> = {
-  desconocido: 0,
-  conocido: 0.5,
-  amigable: 1,
-  amigo: 2,
-  "amigo-cercano": 3.5,
-  "mejor-amigo": 5,
-};
-
-function recencyBonus(daysSinceLast: number | null): number {
-  if (daysSinceLast === null) return 0;
-  if (daysSinceLast <= 7) return 2;
-  if (daysSinceLast <= 30) return 1.5;
-  if (daysSinceLast <= 90) return 1;
-  if (daysSinceLast <= 180) return 0.5;
-  return 0;
-}
-
-function volumeBonus(count90d: number): number {
-  if (count90d <= 0) return 0;
-  return Math.min(2, Math.log2(1 + count90d) * 0.6);
-}
 
 async function main() {
   const { data: people, error } = await supa
@@ -70,13 +48,11 @@ async function main() {
       .gte("observations.observed_at", cutoff)
       .is("observations.superseded_by", null);
 
-    const days =
-      lastObservationAt
-        ? Math.max(0, (Date.now() - new Date(lastObservationAt).getTime()) / 86400000)
-        : null;
-    const closenessW = CLOSENESS_WEIGHT[p.closeness ?? "desconocido"] ?? 0;
-    const total =
-      Math.round((closenessW + recencyBonus(days) + volumeBonus(count ?? 0)) * 10) / 10;
+    const total = computePrior({
+      closeness: p.closeness ?? null,
+      lastObservationAt,
+      observationCount90d: count ?? 0,
+    });
 
     await supa
       .from("people")

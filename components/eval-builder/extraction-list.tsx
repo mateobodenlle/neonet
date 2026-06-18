@@ -134,7 +134,7 @@ export function ExtractionListClient({ initial }: Props) {
                   <td className="px-3 py-2">
                     <Link
                       href={`/dev/eval-builder/${r.id}`}
-                      className="text-blue-600 hover:underline"
+                      className="text-info hover:underline"
                     >
                       Detalle
                     </Link>

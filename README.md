@@ -62,9 +62,9 @@ Además, hay una **demo pública sin login** (`/demo`) con datos ficticios para 
 
 Polish y siguientes:
 
-- Bajar el coste de la llamada de extracción (hoy manda directorio entero — ver `PROJECT.md`).
-- Síntesis automática programada (hoy se dispara manualmente).
+- Bajar más el coste de la extracción: el prefijo del prompt ya es cache-estable; falta evitar volcar el directorio entero cuando crezca (retrieval por relevancia).
 - iOS Safari: el voice path está implementado pero no probado en producción.
+- Terminar de retirar el store zustand (`lib/store.ts`) en las vistas de escritorio.
 
 ---
 

@@ -35,6 +35,7 @@ Setear en Vercel dashboard → Project → Settings → Environment Variables.
 | `OPENAI_RERANK_MODEL` | Public | All | opcional, default `gpt-4o-mini` |
 | `OPENAI_EMBEDDING_MODEL` | Public | All | opcional, default `text-embedding-3-small` |
 | `JOB_SECRET` | **Secret** | All | `openssl rand -hex 32` |
+| `CRON_SECRET` | **Secret** | All | `openssl rand -hex 32` — autoriza los crons de síntesis (sección 7) |
 | `APP_PASSWORD` | **Secret** | All | la contraseña global del app |
 | `JWT_SECRET` | **Secret** | All | `openssl rand -hex 32` |
 | `BYPASS_AUTH` | Public | (no setear) | sólo para emergencias — sección 6 |
@@ -225,15 +226,27 @@ si alguien adivina la URL. No olvides quitarlo.
   ```bash
   SUPABASE_DB_URL='<prod url>' npm run db:migrate
   ```
-- **Job de síntesis** (recomputa `person_profiles` marcados dirty):
+- **Job de síntesis** (recomputa `person_profiles` marcados dirty). Manual:
   ```bash
   curl -X POST https://<tu-dominio>/api/jobs/synthesize \
     -H "x-job-secret: $JOB_SECRET" \
     -H "Content-Type: application/json" \
     -d '{"mode":"process-dirty","batchSize":5}'
   ```
-  Vercel Hobby no tiene cron nativo. Si quieres automatizarlo, un cron
-  externo (cron-job.org, GitHub Actions schedule) que invoque ese curl.
+  **Programado (automático):** `vercel.json` define dos crons de Vercel —
+  `process-dirty` a las 03:00 UTC y `refresh-priors` a las 04:00 UTC. Para
+  que la propia llamada del cron autorice, define la env var **`CRON_SECRET`**
+  en Vercel: Vercel inyecta `Authorization: Bearer $CRON_SECRET` en cada cron
+  y la ruta lo valida (el `GET /api/jobs/synthesize?mode=...` acepta tanto ese
+  Bearer como `x-job-secret`). El cron hace un *drain* con presupuesto de
+  tiempo: vacía la cola de perfiles dirty dentro del `maxDuration` y deja el
+  resto para la siguiente pasada (cada perfil se confirma antes del siguiente,
+  nunca queda a medias).
+
+  El plan Hobby limita los crons a una ejecución diaria. Si necesitas más
+  frecuencia (perfiles más frescos para la extracción), un cron externo
+  (cron-job.org, GitHub Actions) puede pegarle al mismo `GET` con
+  `Authorization: Bearer $CRON_SECRET` cada N minutos.
 
 - **Reporte de coste OpenAI**: corre localmente contra prod:
   ```bash

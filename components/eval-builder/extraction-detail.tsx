@@ -184,7 +184,7 @@ function PlanView({
                 <div className="text-xs">tags: {o.tags.join(", ")}</div>
               )}
               {o.supersedes_hint && (
-                <div className="text-xs text-amber-700 mt-1">
+                <div className="text-xs text-warning mt-1">
                   supersedes hint: {o.supersedes_hint.reason} (
                   {o.supersedes_hint.candidate_observation_ids.join(", ")})
                 </div>

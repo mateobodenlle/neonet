@@ -7,8 +7,8 @@
  *   extractForPersonV2(text, personId, today) → ExtractionV2 with subject hint
  *   applyPlanV2(plan)                         → persists observations, etc.
  *
- * v1 (lib/nl-actions.ts) stays in place during the transition. UI flips to
- * v2 in phase 5.
+ * This is the only live extraction path; the v1 entity-based flow
+ * (lib/nl-actions.ts / lib/nl-prompt.ts) has been removed.
  */
 
 import { randomUUID } from "node:crypto";
