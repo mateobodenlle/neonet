@@ -15,6 +15,7 @@ import { ClosenessPicker } from "@/components/closeness-picker";
 import { NLInputPersonCard } from "@/components/nl-input-person-card";
 import { PersonObservationsCard } from "@/components/person-observations-card";
 import { PersonPendientesCard } from "@/components/person-pendientes-card";
+import { BriefingCard } from "@/components/briefing-card";
 import { LinkedinInsightCard } from "@/components/linkedin-insight-card";
 import { CategoryPicker } from "@/components/category-picker";
 import { TagsEditor } from "@/components/tags-editor";
@@ -234,6 +235,8 @@ export default function ContactDetailPage() {
           <button onClick={() => setEditingContact(true)} className="shrink-0 text-[12px] text-muted-foreground hover:text-foreground">editar</button>
         </div>
       )}
+
+      <BriefingCard personId={person.id} />
 
       {/* Quick add note */}
       <div className="flex items-center gap-2">
