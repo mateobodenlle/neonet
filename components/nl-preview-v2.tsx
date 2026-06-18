@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   Loader2,
@@ -19,7 +19,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useStore } from "@/lib/store";
 import { formatDate } from "@/lib/utils";
-import { collectMentions, parseFacets } from "@/lib/extraction-plan";
+import { collectMentions, parseFacets, roleLabel, facetChips, collectSupersedeHintIds } from "@/lib/extraction-plan";
+import { fetchObservationSnippets, type ObservationSnippet } from "@/lib/observations-actions";
 import type { Person } from "@/lib/types";
 import type {
   ExtractionV2,
@@ -52,6 +53,21 @@ export function NLPreviewV2({
   const people = useStore((s) => s.people);
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
   const mentions = useMemo(() => collectMentions(extraction), [extraction]);
+
+  // Resolve supersede-candidate ids to their content so the user sees what a
+  // replacement would overwrite, not a bare 8-char id.
+  const [snippets, setSnippets] = useState<Record<string, ObservationSnippet>>({});
+  useEffect(() => {
+    const ids = collectSupersedeHintIds(extraction);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    fetchObservationSnippets(ids)
+      .then((s) => !cancelled && setSnippets(s))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [extraction]);
 
   function setResolution(text: string, r: MentionResolution) {
     onChangeResolutions({ ...resolutions, [text]: r });
@@ -231,7 +247,7 @@ export function NLPreviewV2({
                       <div className="mt-1 text-[11px] text-muted-foreground">
                         {o.participants.map((p, k) => (
                           <span key={k} className="mr-2">
-                            <span className="opacity-60">{p.role}</span>{" "}
+                            <span className="opacity-60">{roleLabel(p.role)}</span>{" "}
                             <span>{nameForText(p.mention.text)}</span>
                           </span>
                         ))}
@@ -246,9 +262,13 @@ export function NLPreviewV2({
                         ))}
                       </div>
                     )}
-                    {Object.keys(facets).filter((k) => k !== "type").length > 0 && (
-                      <div className="mt-1 text-[11px] text-muted-foreground font-mono">
-                        {JSON.stringify(facets)}
+                    {facetChips(facets).length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {facetChips(facets).map((f) => (
+                          <Badge key={f.key} variant="default" className="text-[10px] font-normal">
+                            <span className="text-muted-foreground">{f.key}:</span> {f.value}
+                          </Badge>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -259,13 +279,14 @@ export function NLPreviewV2({
                       <ArrowRightLeft className="h-3 w-3" />
                       Posible reemplazo: {hint.reason}
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
+                    <div className="mt-1 space-y-1">
                       {hint.candidate_observation_ids.map((oid) => {
                         const checked = supersedesIds.includes(oid);
+                        const snip = snippets[oid];
                         return (
                           <label
                             key={oid}
-                            className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 cursor-pointer ${
+                            className={`flex items-start gap-1.5 rounded border px-1.5 py-1 cursor-pointer ${
                               checked
                                 ? "border-info bg-info/10"
                                 : "border-border bg-background"
@@ -273,7 +294,7 @@ export function NLPreviewV2({
                           >
                             <input
                               type="checkbox"
-                              className="h-3 w-3"
+                              className="mt-0.5 h-3 w-3"
                               checked={checked}
                               onChange={(e) => {
                                 const next = e.target.checked
@@ -282,7 +303,12 @@ export function NLPreviewV2({
                                 onChangeSupersedes({ ...supersedes, [i]: next });
                               }}
                             />
-                            <code className="text-[10px]">{oid.slice(0, 8)}</code>
+                            <span className="min-w-0 flex-1 text-[12px]">
+                              {snip ? snip.content : `obs ${oid.slice(0, 8)}…`}
+                              {snip?.observedAt && (
+                                <span className="ml-1 text-[10px] text-muted-foreground">· {formatDate(snip.observedAt)}</span>
+                              )}
+                            </span>
                           </label>
                         );
                       })}

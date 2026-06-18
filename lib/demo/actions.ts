@@ -335,6 +335,31 @@ export async function getGraphDataDemo(): Promise<{
   };
 }
 
+export async function searchDirectoryDemo(query: string): Promise<MobilePerson[]> {
+  const state = await requireSession();
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return [];
+  return [...state.people.values()]
+    .filter((p) => !p.archived)
+    .filter((p) =>
+      [p.fullName, p.company, p.role].filter(Boolean).join(" ").toLowerCase().includes(q),
+    )
+    .slice(0, 8)
+    .map((p) => ({ id: p.id, full_name: p.fullName, role: p.role ?? null, company: p.company ?? null }));
+}
+
+export async function getObservationSnippetsDemo(
+  ids: string[],
+): Promise<Record<string, { content: string; observedAt: string }>> {
+  const state = await requireSession();
+  const out: Record<string, { content: string; observedAt: string }> = {};
+  for (const id of ids) {
+    const o = state.observations.get(id);
+    if (o) out[id] = { content: o.content, observedAt: o.observedAt };
+  }
+  return out;
+}
+
 export async function getExtractionByIdDemo(id: string): Promise<DemoExtractionDetail | null> {
   const state = await requireSession();
   const row = state.extractions.get(id);
