@@ -6,6 +6,9 @@ import { ReactFlow, Background, Controls, MiniMap, type Edge as RFEdge, type Nod
 import "@xyflow/react/dist/style.css";
 import type { Person, Edge } from "@/lib/types";
 
+// Concrete hex mirror of the --temp-* tokens (app/globals.css). The graph
+// needs literal colors because the SVG minimap `fill` cannot resolve CSS
+// vars; keep these in sync with the tokens.
 const tempDot = { caliente: "#ef4444", tibio: "#f59e0b", frio: "#94a3b8" } as const;
 
 interface Props {

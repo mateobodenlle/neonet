@@ -62,7 +62,7 @@ export function ClassicHome() {
       {hasToday && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Sun className="h-3.5 w-3.5 text-amber-500" /> Hoy</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Sun className="h-3.5 w-3.5 text-warning" /> Hoy</CardTitle>
             <span className="text-[12px] text-muted-foreground">{formatDate(today, { weekday: "long", day: "2-digit", month: "long" })}</span>
           </CardHeader>
           <CardContent className="space-y-3 p-5 pt-0">

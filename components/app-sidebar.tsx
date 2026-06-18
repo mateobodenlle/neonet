@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Home, Users, CalendarDays, Share2, Search, User } from "lucide-react";
+import { Home, Users, CalendarDays, Share2, Search, User, ClipboardList } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
 
 const nav = [
   { href: "/", label: "Inicio", icon: Home },
+  { href: "/briefing", label: "Briefing", icon: ClipboardList },
   { href: "/contacts", label: "Contactos", icon: Users },
   { href: "/events", label: "Eventos", icon: CalendarDays },
   { href: "/graph", label: "Grafo", icon: Share2 },
@@ -19,7 +20,7 @@ export function AppSidebar() {
   return (
     <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-border bg-background">
       <div className="px-5 pt-6 pb-2">
-        <div className="text-[15px] font-semibold tracking-tight">Agenda</div>
+        <div className="text-[15px] font-semibold tracking-tight">Neonet</div>
       </div>
 
       <button

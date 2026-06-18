@@ -8,39 +8,33 @@ import { useDeleteContact, useDeleteEncounter, useDeleteInteraction, useArchiveP
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PersonAvatar } from "@/components/person-avatar";
 import { TemperaturePicker } from "@/components/temperature-picker";
 import { ClosenessPicker } from "@/components/closeness-picker";
 import { NLInputPersonCard } from "@/components/nl-input-person-card";
 import { PersonObservationsCard } from "@/components/person-observations-card";
 import { PersonPendientesCard } from "@/components/person-pendientes-card";
+import { BriefingCard } from "@/components/briefing-card";
 import { LinkedinInsightCard } from "@/components/linkedin-insight-card";
 import { CategoryPicker } from "@/components/category-picker";
 import { TagsEditor } from "@/components/tags-editor";
 import { ContactDialog } from "@/components/add-contact-dialog";
-import { EncounterDialog, AddEncounterDialog } from "@/components/add-encounter-dialog";
-import { InteractionDialog, AddInteractionDialog } from "@/components/add-interaction-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDate, relativeDate } from "@/lib/utils";
-import { ArrowLeft, Building2, MapPin, Mail, Phone, Globe, Linkedin, Instagram, Twitter, MoreHorizontal, Pencil, Trash2, Archive, ArchiveRestore, StickyNote, Send } from "lucide-react";
+import { ArrowLeft, Building2, MapPin, Mail, Phone, Globe, Linkedin, Instagram, Twitter, MoreHorizontal, Pencil, Trash2, Archive, ArchiveRestore } from "lucide-react";
 import { fetchPersonObservations, fetchPersonProfile } from "@/lib/observations-actions";
-import type { Interaction, Encounter, Temperature, Category, InteractionKind, Observation, PersonProfile } from "@/lib/types";
+import type { Temperature, Category, InteractionKind, Observation, PersonProfile } from "@/lib/types";
 
 export default function ContactDetailPage() {
   const params = useParams<{ id: string }>();
   const d = useDerived();
   const updatePerson = useStore((s) => s.updatePerson);
-  const addInteraction = useStore((s) => s.addInteraction);
   const deleteContact = useDeleteContact();
   const archivePerson = useArchivePerson();
   const deleteEncounter = useDeleteEncounter();
   const deleteInteraction = useDeleteInteraction();
 
   const [editingContact, setEditingContact] = useState(false);
-  const [editingEncounter, setEditingEncounter] = useState<Encounter | null>(null);
-  const [editingInteraction, setEditingInteraction] = useState<Interaction | null>(null);
-  const [quickNote, setQuickNote] = useState("");
   const [timelineFilter, setTimelineFilter] = useState<"all" | InteractionKind>("all");
 
   const person = d.getPerson(params.id);
@@ -98,19 +92,6 @@ export default function ContactDetailPage() {
     const set = new Set(interactions.map((i) => i.kind));
     return (["encuentro", "llamada", "email", "mensaje", "reunion", "nota"] as InteractionKind[]).filter((k) => set.has(k));
   }, [interactions]);
-
-  const submitQuickNote = () => {
-    const text = quickNote.trim();
-    if (!text) return;
-    addInteraction({
-      id: `i-${Date.now()}`,
-      personId: person.id,
-      kind: "nota",
-      date: new Date().toISOString().slice(0, 10),
-      summary: text,
-    });
-    setQuickNote("");
-  };
 
   return (
     <div className="space-y-6">
@@ -235,20 +216,7 @@ export default function ContactDetailPage() {
         </div>
       )}
 
-      {/* Quick add note */}
-      <div className="flex items-center gap-2">
-        <StickyNote className="h-4 w-4 text-muted-foreground" />
-        <Input
-          value={quickNote}
-          onChange={(e) => setQuickNote(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") submitQuickNote(); }}
-          placeholder="Añadir nota rápida y pulsa Enter…"
-          className="h-9 flex-1"
-        />
-        <Button size="sm" variant="outline" onClick={submitQuickNote} disabled={!quickNote.trim()}>
-          <Send className="h-3.5 w-3.5" /> Añadir
-        </Button>
-      </div>
+      <BriefingCard personId={person.id} />
 
       <NLInputPersonCard personId={person.id} personName={person.fullName} />
 
@@ -267,12 +235,11 @@ export default function ContactDetailPage() {
           {/* Unified timeline */}
           <Card>
             <CardHeader className="flex-col items-start gap-3">
-              <div className="flex w-full items-center justify-between">
-                <CardTitle>Actividad</CardTitle>
-                <div className="flex items-center gap-2">
-                  <AddEncounterDialog personId={person.id} />
-                  <AddInteractionDialog personId={person.id} />
-                </div>
+              <div className="flex w-full flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                <CardTitle>Histórico</CardTitle>
+                <span className="text-[11px] text-muted-foreground">
+                  encuentros e interacciones · las notas nuevas viven en Memoria
+                </span>
               </div>
               <div className="flex flex-wrap gap-1">
                 <FilterChip label={`Todo · ${interactions.length}`} active={timelineFilter === "all"} onClick={() => setTimelineFilter("all")} />
@@ -311,10 +278,6 @@ export default function ContactDetailPage() {
                           {i.kind !== "encuentro" && i.body && <p className="mt-1 text-[13px] text-muted-foreground">{i.body}</p>}
                         </div>
                         <RowMenu
-                          onEdit={() => {
-                            if (i.kind === "encuentro" && encounter) setEditingEncounter(encounter);
-                            else setEditingInteraction(i);
-                          }}
                           onDelete={() => {
                             if (i.kind === "encuentro" && encounter) {
                               deleteEncounter(encounter.id, person.fullName);
@@ -376,8 +339,6 @@ export default function ContactDetailPage() {
       </div>
 
       <ContactDialog open={editingContact} onOpenChange={setEditingContact} initial={person} />
-      <EncounterDialog open={!!editingEncounter} onOpenChange={(v) => !v && setEditingEncounter(null)} personId={person.id} initial={editingEncounter ?? undefined} />
-      <InteractionDialog open={!!editingInteraction} onOpenChange={(v) => !v && setEditingInteraction(null)} personId={person.id} initial={editingInteraction ?? undefined} />
     </div>
   );
 }
@@ -407,7 +368,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
   );
 }
 
-function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+function RowMenu({ onDelete }: { onDelete: () => void }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -416,9 +377,6 @@ function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => voi
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-36 p-1">
-        <button onClick={onEdit} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[13px] hover:bg-secondary">
-          <Pencil className="h-3.5 w-3.5" /> Editar
-        </button>
         <button onClick={onDelete} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[13px] text-destructive hover:bg-destructive/10">
           <Trash2 className="h-3.5 w-3.5" /> Eliminar
         </button>

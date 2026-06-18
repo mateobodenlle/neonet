@@ -24,7 +24,7 @@ const NLInputDialog = dynamic(() =>
 );
 
 export const metadata: Metadata = {
-  title: "Agenda2",
+  title: "Neonet",
   description: "CRM personal",
 };
 

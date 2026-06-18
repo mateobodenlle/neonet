@@ -36,6 +36,43 @@ export function parseFacets(raw: string | undefined | null): Record<string, unkn
   }
 }
 
+// Participant roles are stored as raw enum tokens (co_subject, promise_target…)
+// but should never reach the UI like that. One source of truth for both the
+// desktop preview and the mobile review.
+const ROLE_LABELS: Record<string, string> = {
+  primary: "principal",
+  co_subject: "co-sujeto",
+  related: "relacionado",
+  source: "fuente",
+  mentioned: "mencionado",
+  promise_target: "destinatario",
+};
+
+export function roleLabel(role: string): string {
+  return ROLE_LABELS[role] ?? role.replace(/_/g, " ");
+}
+
+/** Facet key/value pairs (excluding the `type` discriminator) as readable
+ *  strings, so the preview can render chips instead of dumping raw JSON. */
+export function facetChips(facets: Record<string, unknown>): { key: string; value: string }[] {
+  return Object.entries(facets)
+    .filter(([k]) => k !== "type")
+    .map(([key, v]) => ({
+      key,
+      value: typeof v === "object" && v !== null ? JSON.stringify(v) : String(v),
+    }));
+}
+
+/** Every observation id referenced by a supersedes_hint, so a caller can
+ *  fetch their content for a meaningful "you're replacing this" preview. */
+export function collectSupersedeHintIds(extraction: ExtractionV2): string[] {
+  const ids = new Set<string>();
+  for (const o of extraction.observations ?? []) {
+    for (const id of o.supersedes_hint?.candidate_observation_ids ?? []) ids.add(id);
+  }
+  return [...ids];
+}
+
 export function collectCandidateIds(raw: ExtractionV2): string[] {
   const ids = new Set<string>();
   const visit = (m: PersonMention) => m.candidate_ids?.forEach((id) => ids.add(id));

@@ -5,6 +5,8 @@ import {
   applyExtractionDemo,
   discardExtractionDemo,
   getExtractionByIdDemo,
+  searchDirectoryDemo,
+  getObservationSnippetsDemo,
 } from "@/lib/demo/actions";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +46,8 @@ export default async function DemoReviewPage({ params }: PageProps) {
       people={row.people}
       applyAction={applyExtractionDemo}
       discardAction={discardExtractionDemo}
+      searchPeople={searchDirectoryDemo}
+      fetchSnippets={getObservationSnippetsDemo}
       pendingHref="/demo/m/pending"
     />
   );

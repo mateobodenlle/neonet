@@ -327,12 +327,56 @@ export async function getDashboardDemo(): Promise<{
 export async function getGraphDataDemo(): Promise<{
   people: Person[];
   edges: Edge[];
+  coEventEdges: { key: string; weight: number }[];
 }> {
   const state = await requireSession();
+  // Co-event edges: people who share an event, same derivation as /graph.
+  const byEvent = new Map<string, Set<string>>();
+  for (const en of state.encounters.values()) {
+    if (!en.eventId) continue;
+    if (!byEvent.has(en.eventId)) byEvent.set(en.eventId, new Set());
+    byEvent.get(en.eventId)!.add(en.personId);
+  }
+  const co = new Map<string, number>();
+  for (const set of byEvent.values()) {
+    const arr = [...set];
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        const k = arr[i] < arr[j] ? `${arr[i]}|${arr[j]}` : `${arr[j]}|${arr[i]}`;
+        co.set(k, (co.get(k) ?? 0) + 1);
+      }
+    }
+  }
   return {
     people: [...state.people.values()].filter((p) => !p.archived),
     edges: [...state.edges.values()],
+    coEventEdges: [...co.entries()].map(([key, weight]) => ({ key, weight })),
   };
+}
+
+export async function searchDirectoryDemo(query: string): Promise<MobilePerson[]> {
+  const state = await requireSession();
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return [];
+  return [...state.people.values()]
+    .filter((p) => !p.archived)
+    .filter((p) =>
+      [p.fullName, p.company, p.role].filter(Boolean).join(" ").toLowerCase().includes(q),
+    )
+    .slice(0, 8)
+    .map((p) => ({ id: p.id, full_name: p.fullName, role: p.role ?? null, company: p.company ?? null }));
+}
+
+export async function getObservationSnippetsDemo(
+  ids: string[],
+): Promise<Record<string, { content: string; observedAt: string }>> {
+  const state = await requireSession();
+  const out: Record<string, { content: string; observedAt: string }> = {};
+  for (const id of ids) {
+    const o = state.observations.get(id);
+    if (o) out[id] = { content: o.content, observedAt: o.observedAt };
+  }
+  return out;
 }
 
 export async function getExtractionByIdDemo(id: string): Promise<DemoExtractionDetail | null> {

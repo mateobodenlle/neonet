@@ -20,7 +20,6 @@
                   "@/lib/server-actions",
                   "@/lib/repository",
                   "@/lib/mobile-actions",
-                  "@/lib/nl-actions",
                   "@/lib/nl-actions-v2",
                   "@/lib/observations-actions",
                   "@/lib/me-profile-actions",
