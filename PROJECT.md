@@ -159,13 +159,12 @@ Variante completamente aislada del CRM real, accesible sin contraseña desde el 
 
 ## Estado actual
 
-**Funcional**: contactos con ficha editable, eventos con asistentes, grafo de conexiones, pendientes con undo, pain points, timeline unificado, command palette, archive, NL input global y por-persona, multi-persona promises, closeness atemporal, persistencia real en Supabase, importers LinkedIn + vCard, móvil `/m` con voz, **demo pública `/demo` (desktop + móvil) con datos ficticios aislada del CRM real**.
+**Funcional**: contactos con ficha editable, eventos con asistentes, grafo de conexiones, pendientes con undo, pain points, timeline unificado, command palette, archive, NL input global y por-persona, multi-persona promises, closeness atemporal, persistencia real en Supabase, importers LinkedIn + vCard, móvil `/m` con voz, **briefing pre-reunión** (ficha + ruta `/briefing`), **consulta semántica en lenguaje natural** (Cmd-K → "Preguntar a la memoria"), **síntesis de perfil programada** (cron de Vercel), **demo pública `/demo` (desktop + móvil) con datos ficticios aislada del CRM real**.
 
 **Pendiente** (en orden aproximado de prioridad):
-- Optimización de coste del NL extraction (cache + tools + densificación).
-- App móvil Android con voice-first (grabas 30s saliendo de un café, transcripción + extracción).
-- Consulta NL semántica sobre notas (embeddings + rerank).
-- Briefing pre-reunión automatizado.
+- Completar la retirada de `lib/store.ts` (zustand) en home / contactos / grafo hacia lecturas server-side; el flujo de observaciones, móvil y demo ya no lo usan.
+- App móvil Android nativa con voice-first (hoy existe el flujo web `/m` con voz).
+- Retrieval por relevancia en vez de volcar el directorio completo en la extracción, y rerank semántico — sólo cuando el directorio crezca lo bastante para que el coste/latencia lo justifiquen (el prefijo del prompt ya es cache-estable).
 
 ## Convenciones
 

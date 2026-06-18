@@ -327,11 +327,30 @@ export async function getDashboardDemo(): Promise<{
 export async function getGraphDataDemo(): Promise<{
   people: Person[];
   edges: Edge[];
+  coEventEdges: { key: string; weight: number }[];
 }> {
   const state = await requireSession();
+  // Co-event edges: people who share an event, same derivation as /graph.
+  const byEvent = new Map<string, Set<string>>();
+  for (const en of state.encounters.values()) {
+    if (!en.eventId) continue;
+    if (!byEvent.has(en.eventId)) byEvent.set(en.eventId, new Set());
+    byEvent.get(en.eventId)!.add(en.personId);
+  }
+  const co = new Map<string, number>();
+  for (const set of byEvent.values()) {
+    const arr = [...set];
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        const k = arr[i] < arr[j] ? `${arr[i]}|${arr[j]}` : `${arr[j]}|${arr[i]}`;
+        co.set(k, (co.get(k) ?? 0) + 1);
+      }
+    }
+  }
   return {
     people: [...state.people.values()].filter((p) => !p.archived),
     edges: [...state.edges.values()],
+    coEventEdges: [...co.entries()].map(([key, weight]) => ({ key, weight })),
   };
 }
 

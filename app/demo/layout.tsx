@@ -26,7 +26,7 @@ export default async function DemoLayout({ children }: { children: React.ReactNo
   if (isMobile) {
     return (
       <div className="min-h-screen bg-background text-foreground">
-        <DemoHeader pendingCount={count} variant="mobile" />
+        <DemoHeader pendingCount={count} />
         {banner}
         <main className="mx-auto max-w-xl px-4 pb-24 pt-4 text-[15px]">{children}</main>
       </div>

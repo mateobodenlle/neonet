@@ -19,58 +19,9 @@ import "server-only";
 
 import { supabaseAdmin } from "./supabase-admin";
 import type { Closeness } from "./types";
+import { computePrior, type PriorInputs } from "./person-prior-score";
 
-// ---- weights -----------------------------------------------------------
-
-const CLOSENESS_WEIGHT: Record<Closeness, number> = {
-  desconocido: 0,
-  conocido: 0.5,
-  amigable: 1,
-  amigo: 2,
-  "amigo-cercano": 3.5,
-  "mejor-amigo": 5,
-};
-
-/** Recency bonus from days since last observation. */
-function recencyBonus(daysSinceLast: number | null): number {
-  if (daysSinceLast === null) return 0;
-  if (daysSinceLast <= 7) return 2;
-  if (daysSinceLast <= 30) return 1.5;
-  if (daysSinceLast <= 90) return 1;
-  if (daysSinceLast <= 180) return 0.5;
-  return 0;
-}
-
-/** Diminishing returns on volume — log keeps a single mega-active contact
- *  from dwarfing every other signal. */
-function volumeBonus(count90d: number): number {
-  if (count90d <= 0) return 0;
-  return Math.min(2, Math.log2(1 + count90d) * 0.6);
-}
-
-// ---- pure compute ------------------------------------------------------
-
-export interface PriorInputs {
-  closeness: Closeness | null | undefined;
-  lastObservationAt: string | null | undefined;
-  observationCount90d: number;
-}
-
-export function computePrior(inputs: PriorInputs): number {
-  const c = (inputs.closeness ?? "desconocido") as Closeness;
-  const closenessW = CLOSENESS_WEIGHT[c] ?? 0;
-  const days =
-    inputs.lastObservationAt
-      ? Math.max(
-          0,
-          (Date.now() - new Date(inputs.lastObservationAt).getTime()) / 86400000
-        )
-      : null;
-  const recency = recencyBonus(days);
-  const volume = volumeBonus(inputs.observationCount90d);
-  const total = closenessW + recency + volume;
-  return Math.round(total * 10) / 10;
-}
+export { computePrior, type PriorInputs };
 
 // ---- DB-backed refresh -------------------------------------------------
 
