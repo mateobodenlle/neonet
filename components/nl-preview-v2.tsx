@@ -54,6 +54,10 @@ export function NLPreviewV2({
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
   const mentions = useMemo(() => collectMentions(extraction), [extraction]);
 
+  // High-confidence mentions hide the picker behind "cambiar"; this tracks
+  // which ones the user expanded to reassign manually.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
   // Resolve supersede-candidate ids to their content so the user sees what a
   // replacement would overwrite, not a bare 8-char id.
   const [snippets, setSnippets] = useState<Record<string, ObservationSnippet>>({});
@@ -164,7 +168,7 @@ export function NLPreviewV2({
                     </>
                   )}
                 </div>
-                {conf !== "high" && (
+                {(conf !== "high" || expanded[m.text]) && (
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {m.candidate_ids.length > 1 &&
                       m.candidate_ids.map((id) => {
@@ -196,12 +200,12 @@ export function NLPreviewV2({
                     />
                   </div>
                 )}
-                {conf === "high" && (
+                {conf === "high" && !expanded[m.text] && (
                   <div className="mt-1 text-[11px] text-muted-foreground">
                     Asignación automática.{" "}
                     <button
                       className="underline hover:text-foreground"
-                      onClick={() => setResolution(m.text, { kind: "skip" })}
+                      onClick={() => setExpanded((e) => ({ ...e, [m.text]: true }))}
                     >
                       cambiar
                     </button>
