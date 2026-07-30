@@ -163,6 +163,7 @@ Variante completamente aislada del CRM real, accesible sin contraseña desde el 
 
 **Pendiente** (en orden aproximado de prioridad):
 - Completar la retirada de `lib/store.ts` (zustand) en home / contactos / grafo hacia lecturas server-side; el flujo de observaciones, móvil y demo ya no lo usan.
+- Decidir el modelo de relaciones entre contactos, a medio migrar desde v1: la extracción v2 emite observaciones `type: 'relacion'` pero `applyPlanV2` ya no materializa aristas en `edges`, así que el grafo solo crece por altas manuales e imports. Falta decidir si `edges` pasa a ser una proyección derivada de las observaciones de relación (en el apply o vía job) o si el grafo se lee directamente de observations; al hacerlo, unificar los `kind` (el prompt sugiere `presentado-por`/`trabaja-con`, `lib/observations.ts` documenta `conoce`/`trabaja-con` y `edges` admite cinco valores).
 - App móvil Android nativa con voice-first (hoy existe el flujo web `/m` con voz).
 - Retrieval por relevancia en vez de volcar el directorio completo en la extracción, y rerank semántico — sólo cuando el directorio crezca lo bastante para que el coste/latencia lo justifiquen (el prefijo del prompt ya es cache-estable).
 
