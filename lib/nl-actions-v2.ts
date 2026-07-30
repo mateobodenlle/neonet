@@ -13,7 +13,7 @@
 
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
-import { openai, EXTRACTION_MODEL, temperatureParam } from "./openai";
+import { chatClientFor, EXTRACTION_MODEL, providerBodyParams, temperatureParam } from "./openai";
 import { withLlmLoggingDetailed, type LlmPurpose } from "./llm-observability";
 import {
   insertExtraction,
@@ -170,10 +170,12 @@ interface RunExtractionResult {
 async function runExtraction(opts: RunOpts): Promise<RunExtractionResult> {
   type ChatBody = OpenAI.ChatCompletionCreateParamsNonStreaming & {
     prompt_cache_key?: string;
+    provider?: { require_parameters: boolean };
   };
   const body: ChatBody = {
     model: EXTRACTION_MODEL,
     ...temperatureParam(EXTRACTION_MODEL, 0.1),
+    ...providerBodyParams(EXTRACTION_MODEL),
     response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA_V2 as never },
     messages: [
       { role: "system", content: opts.systemContent },
@@ -189,7 +191,7 @@ async function runExtraction(opts: RunOpts): Promise<RunExtractionResult> {
       metadata: opts.metadata,
     },
     async () => {
-      const completion = await openai.chat.completions.create(body);
+      const completion = await chatClientFor(EXTRACTION_MODEL).chat.completions.create(body);
       const raw = completion.choices[0]?.message?.content;
       if (!raw) throw new Error("Empty response from OpenAI");
       const parsed = JSON.parse(raw) as ExtractionV2;

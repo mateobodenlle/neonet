@@ -23,7 +23,7 @@ config({ path: ".env.local" });
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import OpenAI from "openai";
+import { createChatClient, providerBodyParams, temperatureParam } from "../lib/llm-provider";
 import {
   EXTRACTION_SCHEMA_V2,
   compactDirectoryV2,
@@ -39,8 +39,8 @@ const supa = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_EXTRACTION_MODEL ?? "gpt-4o-mini";
+const openai = createChatClient(MODEL);
 const verbose = process.argv.includes("--verbose");
 
 interface FacetExpectationLegacy {
@@ -133,7 +133,8 @@ async function runOne(c: Case): Promise<ExtractionV2> {
   const today = new Date().toISOString().slice(0, 10);
   const completion = await openai.chat.completions.create({
     model: MODEL,
-    temperature: 0.1,
+    ...temperatureParam(MODEL, 0.1),
+    ...providerBodyParams(MODEL),
     response_format: {
       type: "json_schema",
       json_schema: EXTRACTION_SCHEMA_V2 as never,

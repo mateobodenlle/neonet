@@ -1,13 +1,26 @@
 import "server-only";
 import OpenAI from "openai";
+import { createChatClient, isOpenRouterModel } from "./llm-provider";
 
 const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
+// Direct OpenAI client. Chat calls should go through chatClientFor(model);
+// embeddings and audio always use this one (OpenRouter serves neither).
 export const openai = new OpenAI({ apiKey });
 
+// One client per provider: bare model ids reuse the OpenAI client above,
+// namespaced ids ("vendor/model") get a lazily-created OpenRouter client.
+let openrouterClient: OpenAI | null = null;
+export function chatClientFor(model: string): OpenAI {
+  if (!isOpenRouterModel(model)) return openai;
+  if (!openrouterClient) openrouterClient = createChatClient(model);
+  return openrouterClient;
+}
+
 // Model selection. Defaults are tuned for cost; bump to gpt-4o on critical
-// paths if extraction quality regresses.
+// paths if extraction quality regresses. An OpenRouter-namespaced id in any
+// of these env vars reroutes that path without further code changes.
 export const EXTRACTION_MODEL =
   process.env.OPENAI_EXTRACTION_MODEL ?? "gpt-4o-mini";
 
@@ -23,20 +36,10 @@ export const RERANK_MODEL =
 export const EMBEDDING_MODEL =
   process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
 
-// Reasoning models reject any `temperature` other than their default and
-// 400 on the request (see the synthesis gpt-5 incident). Prefix list —
-// widen it as new reasoning families ship (gpt-5.x, o5, ...).
-const REASONING_MODEL_PREFIXES = ["gpt-5", "o1", "o3", "o4"];
-
-export function isReasoningModel(model: string): boolean {
-  return REASONING_MODEL_PREFIXES.some((prefix) => model.startsWith(prefix));
-}
-
-// Spread into a ChatCompletionCreateParams object. Returns {} for reasoning
-// models so the call falls back to their fixed default temperature.
-export function temperatureParam(
-  model: string,
-  value: number
-): { temperature?: number } {
-  return isReasoningModel(model) ? {} : { temperature: value };
-}
+// Re-exported so call sites keep a single import surface.
+export {
+  isReasoningModel,
+  temperatureParam,
+  providerBodyParams,
+  isOpenRouterModel,
+} from "./llm-provider";

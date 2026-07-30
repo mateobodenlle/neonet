@@ -13,7 +13,7 @@ import "server-only";
  * directory.
  */
 
-import { openai, SYNTHESIS_MODEL } from "./openai";
+import { chatClientFor, SYNTHESIS_MODEL, providerBodyParams } from "./openai";
 import { supabaseAdmin } from "./supabase-admin";
 import { embedProfile } from "./embeddings";
 import { withLlmLogging, type LlmPurpose } from "./llm-observability";
@@ -129,8 +129,9 @@ async function callSynthesis(
       },
     },
     async () => {
-      const completion = await openai.chat.completions.create({
+      const completion = await chatClientFor(SYNTHESIS_MODEL).chat.completions.create({
         model: SYNTHESIS_MODEL,
+        ...providerBodyParams(SYNTHESIS_MODEL),
         // No explicit temperature: the default synthesis model (gpt-5) is a
         // reasoning model that only accepts the default (1) and 400s on any
         // other value. Synthesis is a summarization task, so the default is

@@ -14,7 +14,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import OpenAI from "openai";
+import { createChatClient, providerBodyParams, temperatureParam } from "../lib/llm-provider";
 import {
   PROFILE_SCHEMA,
   profileSystemPrompt,
@@ -22,8 +22,8 @@ import {
   type SynthesisObservationLine,
 } from "../lib/profile-prompt";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_SYNTHESIS_MODEL ?? "gpt-4o";
+const openai = createChatClient(MODEL);
 const verbose = process.argv.includes("--verbose");
 
 interface CaseObservation {
@@ -75,7 +75,8 @@ async function runOne(c: Case): Promise<LLMOut> {
   }));
   const completion = await openai.chat.completions.create({
     model: MODEL,
-    temperature: 0.2,
+    ...temperatureParam(MODEL, 0.2),
+    ...providerBodyParams(MODEL),
     response_format: { type: "json_schema", json_schema: PROFILE_SCHEMA as never },
     messages: [
       { role: "system", content: profileSystemPrompt(today) },
