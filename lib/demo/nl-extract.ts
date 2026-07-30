@@ -9,7 +9,7 @@ import {
   type DirectoryRowV2,
   type ContextObservation,
 } from "@/lib/nl-prompt-v2";
-import { openai, EXTRACTION_MODEL } from "@/lib/openai";
+import { openai, EXTRACTION_MODEL, temperatureParam } from "@/lib/openai";
 import type { ExtractionV2 } from "@/lib/nl-types";
 import type { DemoSessionState } from "./types";
 
@@ -74,7 +74,7 @@ export async function extractFromNoteDemo(
   };
   const body: ChatBody = {
     model: EXTRACTION_MODEL,
-    temperature: 0.1,
+    ...temperatureParam(EXTRACTION_MODEL, 0.1),
     response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA_V2 as never },
     messages: [
       { role: "system", content: systemContent },

@@ -12,7 +12,7 @@ import "server-only";
  */
 
 import { randomUUID } from "node:crypto";
-import { openai, EXTRACTION_MODEL } from "./openai";
+import { openai, EXTRACTION_MODEL, temperatureParam } from "./openai";
 import { supabaseAdmin } from "./supabase-admin";
 import {
   persistObservation,
@@ -294,7 +294,7 @@ export async function generateLinkedinInsight(personId: string): Promise<Insight
 
   const completion = await openai.chat.completions.create({
     model: EXTRACTION_MODEL,
-    temperature: 0.1,
+    ...temperatureParam(EXTRACTION_MODEL, 0.1),
     response_format: { type: "json_schema", json_schema: INSIGHT_SCHEMA as never },
     messages: [
       { role: "system", content: systemContent },

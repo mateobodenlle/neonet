@@ -13,7 +13,7 @@
 
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
-import { openai, EXTRACTION_MODEL } from "./openai";
+import { openai, EXTRACTION_MODEL, temperatureParam } from "./openai";
 import { withLlmLoggingDetailed, type LlmPurpose } from "./llm-observability";
 import {
   insertExtraction,
@@ -173,7 +173,7 @@ async function runExtraction(opts: RunOpts): Promise<RunExtractionResult> {
   };
   const body: ChatBody = {
     model: EXTRACTION_MODEL,
-    temperature: 0.1,
+    ...temperatureParam(EXTRACTION_MODEL, 0.1),
     response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA_V2 as never },
     messages: [
       { role: "system", content: opts.systemContent },

@@ -22,3 +22,21 @@ export const RERANK_MODEL =
 
 export const EMBEDDING_MODEL =
   process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+
+// Reasoning models reject any `temperature` other than their default and
+// 400 on the request (see the synthesis gpt-5 incident). Prefix list —
+// widen it as new reasoning families ship (gpt-5.x, o5, ...).
+const REASONING_MODEL_PREFIXES = ["gpt-5", "o1", "o3", "o4"];
+
+export function isReasoningModel(model: string): boolean {
+  return REASONING_MODEL_PREFIXES.some((prefix) => model.startsWith(prefix));
+}
+
+// Spread into a ChatCompletionCreateParams object. Returns {} for reasoning
+// models so the call falls back to their fixed default temperature.
+export function temperatureParam(
+  model: string,
+  value: number
+): { temperature?: number } {
+  return isReasoningModel(model) ? {} : { temperature: value };
+}
