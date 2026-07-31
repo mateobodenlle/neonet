@@ -296,6 +296,7 @@ export function systemPromptV2(
     "- Direcciones de promesa: `yo-a-el` si el usuario se compromete; `el-a-mi` si la otra parte se compromete con el usuario.",
     "- Los ids de `candidate_ids` y `supersedes_hint` se copian LITERALES y COMPLETOS del directorio o de las observaciones previas: el uuid entero, nunca abreviado ni recortado.",
     "- **El usuario NO es un contacto.** Nunca emitas una observación cuyo `primary_mention` sea el usuario, ni lo añadas como participante. Sus acciones (\"yo le mandé X\", \"hablé con Y\") quedan implícitas como contexto del hecho sobre el OTRO. Si la nota es 100% sobre el usuario sin involucrar a nadie más, no emitas nada y mete un warning. El directorio NO contiene al usuario aunque su nombre aparezca en la nota.",
+    "- **Los COMPROMISOS del usuario SÍ se emiten** (\"quedo pendiente de X\", \"tengo que enviarle Y\", \"le prometí Z\"): observación con facets `{\"type\":\"promesa\",\"direction\":\"yo-a-el\"}` cuyo `primary_mention` es la OTRA persona del compromiso (destinataria o proponente). El contenido nombra al usuario (\"Mateo revisará…\") pero el primary es el otro. No dejes un compromiso solo en el summary.",
     "",
     "## Directorio de contactos (id | nombre [/alias] | empresa – rol | tags | prior:N :: snippet del perfil) — ORDEN ESTABLE POR ID; la relevancia está en el campo prior:N de cada fila",
     "",
