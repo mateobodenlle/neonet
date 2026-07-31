@@ -78,7 +78,10 @@ export const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-2 text-[13px] outline-none aria-selected:bg-secondary aria-selected:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      // cmdk ≥1.0 stamps data-disabled="false" on enabled items; the bare
+      // data-[disabled] variant matches attribute PRESENCE, which grayed out
+      // and blocked clicks on every item. Match the value explicitly.
+      "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-2 text-[13px] outline-none aria-selected:bg-secondary aria-selected:text-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
       className
     )}
     {...props}
