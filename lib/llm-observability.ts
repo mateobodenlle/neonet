@@ -142,7 +142,10 @@ export async function withLlmLoggingDetailed<T>(
     const promptTokens = usage?.prompt_tokens;
     const cachedTokens = usage?.prompt_tokens_details?.cached_tokens;
     const completionTokens = usage?.completion_tokens;
-    void logLlmCall({
+    // Awaited, not fire-and-forget: callers persist rows whose llm_call_id
+    // FK-references this insert (nl_extractions), and losing the race left
+    // those inserts failing silently. logLlmCall never throws.
+    await logLlmCall({
       ...base,
       id: llmCallId,
       metadata: extraMetadata ? { ...(base.metadata ?? {}), ...extraMetadata } : base.metadata,
