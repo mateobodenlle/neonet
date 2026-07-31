@@ -14,6 +14,7 @@
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
 import { chatClientFor, EXTRACTION_MODEL, providerBodyParams, temperatureParam } from "./openai";
+import { expandTruncatedIds } from "./extraction-plan";
 import { withLlmLoggingDetailed, type LlmPurpose } from "./llm-observability";
 import {
   insertExtraction,
@@ -275,6 +276,11 @@ export async function extractFromNoteV2(
       context_observations: contextObs.length,
     },
   });
+  expandTruncatedIds(
+    run.extraction,
+    directoryRows.map((d) => d.id),
+    contextObs.map((o) => o.id)
+  );
   const extractionId = randomUUID();
   await insertExtraction({
     id: extractionId,
@@ -334,6 +340,11 @@ export async function extractForPersonV2(
       context_observations: contextObs.length,
     },
   });
+  expandTruncatedIds(
+    run.extraction,
+    directoryRows.map((d) => d.id),
+    contextObs.map((o) => o.id)
+  );
   const extractionId = randomUUID();
   await insertExtraction({
     id: extractionId,

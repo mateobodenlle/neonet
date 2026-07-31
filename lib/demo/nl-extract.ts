@@ -10,6 +10,7 @@ import {
   type ContextObservation,
 } from "@/lib/nl-prompt-v2";
 import { chatClientFor, EXTRACTION_MODEL, providerBodyParams, temperatureParam } from "@/lib/openai";
+import { expandTruncatedIds } from "@/lib/extraction-plan";
 import type { ExtractionV2 } from "@/lib/nl-types";
 import type { DemoSessionState } from "./types";
 
@@ -87,5 +88,11 @@ export async function extractFromNoteDemo(
   const completion = await chatClientFor(EXTRACTION_MODEL).chat.completions.create(body);
   const raw = completion.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty response from OpenAI");
-  return JSON.parse(raw) as ExtractionV2;
+  const parsed = JSON.parse(raw) as ExtractionV2;
+  expandTruncatedIds(
+    parsed,
+    directoryRows.map((d) => d.id),
+    contextObs.map((o) => o.id)
+  );
+  return parsed;
 }

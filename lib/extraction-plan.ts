@@ -26,6 +26,39 @@ export function defaultResolution(m: PersonMention): MentionResolution {
   return { kind: "skip" };
 }
 
+// Some models copy directory ids truncated (e.g. an 8-char uuid prefix).
+// Expand any id that uniquely prefixes a known id so the preview and apply
+// can resolve it; unknown ids are left as-is and dropped downstream.
+function makeIdExpander(known: string[]): (id: string) => string {
+  const exact = new Set(known);
+  return (id) => {
+    if (exact.has(id) || id.length < 6) return id;
+    const hits = known.filter((k) => k.startsWith(id));
+    return hits.length === 1 ? hits[0] : id;
+  };
+}
+
+export function expandTruncatedIds(
+  extraction: ExtractionV2,
+  personIds: string[],
+  observationIds: string[]
+): void {
+  const person = makeIdExpander(personIds);
+  const obs = makeIdExpander(observationIds);
+  const fixMention = (m: PersonMention | null | undefined) => {
+    if (m?.candidate_ids?.length) m.candidate_ids = m.candidate_ids.map(person);
+  };
+  for (const o of extraction.observations ?? []) {
+    fixMention(o.primary_mention);
+    for (const p of o.participants ?? []) fixMention(p.mention);
+    const hint = o.supersedes_hint;
+    if (hint?.candidate_observation_ids?.length) {
+      hint.candidate_observation_ids = hint.candidate_observation_ids.map(obs);
+    }
+  }
+  for (const u of extraction.person_updates ?? []) fixMention(u.primary_mention);
+}
+
 export function parseFacets(raw: string | undefined | null): Record<string, unknown> {
   if (!raw) return {};
   try {

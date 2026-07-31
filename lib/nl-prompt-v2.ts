@@ -294,6 +294,7 @@ export function systemPromptV2(
     "- No inventes contexto: si la nota no menciona algo, no lo crees.",
     "- Una observación = un hecho. \"Tiene 3 hijos y vive en Vigo\" → 2 observaciones.",
     "- Direcciones de promesa: `yo-a-el` si el usuario se compromete; `el-a-mi` si la otra parte se compromete con el usuario.",
+    "- Los ids de `candidate_ids` y `supersedes_hint` se copian LITERALES y COMPLETOS del directorio o de las observaciones previas: el uuid entero, nunca abreviado ni recortado.",
     "- **El usuario NO es un contacto.** Nunca emitas una observación cuyo `primary_mention` sea el usuario, ni lo añadas como participante. Sus acciones (\"yo le mandé X\", \"hablé con Y\") quedan implícitas como contexto del hecho sobre el OTRO. Si la nota es 100% sobre el usuario sin involucrar a nadie más, no emitas nada y mete un warning. El directorio NO contiene al usuario aunque su nombre aparezca en la nota.",
     "",
     "## Directorio de contactos (id | nombre [/alias] | empresa – rol | tags | prior:N :: snippet del perfil) — ORDEN ESTABLE POR ID; la relevancia está en el campo prior:N de cada fila",
