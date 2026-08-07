@@ -22,6 +22,8 @@ Thumbs.db
 .idea
 *.swp
 .claude
+.agents
+.codex
 .mcp.json
 
 # next
